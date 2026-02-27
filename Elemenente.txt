@@ -1,0 +1,1651 @@
+"use client"
+
+import { cva } from "class-variance-authority"
+import { HTMLMotionProps, motion } from "motion/react"
+
+import { cn } from "@/lib/utils"
+
+const morphingSquareVariants = cva("flex gap-2 items-center justify-center", {
+  variants: {
+    messagePlacement: {
+      bottom: "flex-col",
+      top: "flex-col-reverse",
+      right: "flex-row",
+      left: "flex-row-reverse",
+    },
+  },
+  defaultVariants: {
+    messagePlacement: "bottom",
+  },
+})
+
+export interface MorphingSquareProps {
+  message?: string
+  /**
+   * Position of the message relative to the spinner.
+   * @default bottom
+   */
+  messagePlacement?: "top" | "bottom" | "left" | "right"
+}
+
+export function MorphingSquare({
+  className,
+  message,
+  messagePlacement = "bottom",
+  ...props
+}: HTMLMotionProps<"div"> & MorphingSquareProps) {
+  return (
+    <div className={cn(morphingSquareVariants({ messagePlacement }))}>
+      <motion.div
+        className={cn("w-10 h-10 bg-foreground", className)}
+        animate={{
+          borderRadius: ["6%", "50%", "6%"],
+          rotate: [0, 180, 360],
+        }}
+        transition={{
+          duration: 2,
+          repeat: Number.POSITIVE_INFINITY,
+          ease: "easeInOut",
+        }}
+        {...props}
+      />
+      {message && <div>{message}</div>}
+    </div>
+  )
+}
+
+
+"use client"
+
+import React, { useEffect, useState } from "react"
+import { motion } from "framer-motion"
+import Link from "next/link"
+import { LucideIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface NavItem {
+  name: string
+  url: string
+  icon: LucideIcon
+}
+
+interface NavBarProps {
+  items: NavItem[]
+  className?: string
+}
+
+export function NavBar({ items, className }: NavBarProps) {
+  const [activeTab, setActiveTab] = useState(items[0].name)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
+
+  return (
+    <div
+      className={cn(
+        "fixed bottom-0 sm:top-0 left-1/2 -translate-x-1/2 z-50 mb-6 sm:pt-6",
+        className,
+      )}
+    >
+      <div className="flex items-center gap-3 bg-background/5 border border-border backdrop-blur-lg py-1 px-1 rounded-full shadow-lg">
+        {items.map((item) => {
+          const Icon = item.icon
+          const isActive = activeTab === item.name
+
+          return (
+            <Link
+              key={item.name}
+              href={item.url}
+              onClick={() => setActiveTab(item.name)}
+              className={cn(
+                "relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors",
+                "text-foreground/80 hover:text-primary",
+                isActive && "bg-muted text-primary",
+              )}
+            >
+              <span className="hidden md:inline">{item.name}</span>
+              <span className="md:hidden">
+                <Icon size={18} strokeWidth={2.5} />
+              </span>
+              {isActive && (
+                <motion.div
+                  layoutId="lamp"
+                  className="absolute inset-0 w-full bg-primary/5 rounded-full -z-10"
+                  initial={false}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 30,
+                  }}
+                >
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-t-full">
+                    <div className="absolute w-12 h-6 bg-primary/20 rounded-full blur-md -top-2 -left-2" />
+                    <div className="absolute w-8 h-6 bg-primary/20 rounded-full blur-md -top-1" />
+                    <div className="absolute w-4 h-4 bg-primary/20 rounded-full blur-sm top-0 left-2" />
+                  </div>
+                </motion.div>
+              )}
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+
+
+"use client";
+
+import * as React from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useOnClickOutside } from "usehooks-ts";
+import { cn } from "@/lib/utils";
+import { LucideIcon } from "lucide-react";
+
+interface Tab {
+  title: string;
+  icon: LucideIcon;
+  type?: never;
+}
+
+interface Separator {
+  type: "separator";
+  title?: never;
+  icon?: never;
+}
+
+type TabItem = Tab | Separator;
+
+interface ExpandableTabsProps {
+  tabs: TabItem[];
+  className?: string;
+  activeColor?: string;
+  onChange?: (index: number | null) => void;
+}
+
+const buttonVariants = {
+  initial: {
+    gap: 0,
+    paddingLeft: ".5rem",
+    paddingRight: ".5rem",
+  },
+  animate: (isSelected: boolean) => ({
+    gap: isSelected ? ".5rem" : 0,
+    paddingLeft: isSelected ? "1rem" : ".5rem",
+    paddingRight: isSelected ? "1rem" : ".5rem",
+  }),
+};
+
+const spanVariants = {
+  initial: { width: 0, opacity: 0 },
+  animate: { width: "auto", opacity: 1 },
+  exit: { width: 0, opacity: 0 },
+};
+
+const transition = { delay: 0.1, type: "spring", bounce: 0, duration: 0.6 };
+
+export function ExpandableTabs({
+  tabs,
+  className,
+  activeColor = "text-primary",
+  onChange,
+}: ExpandableTabsProps) {
+  const [selected, setSelected] = React.useState<number | null>(null);
+  const outsideClickRef = React.useRef(null);
+
+  useOnClickOutside(outsideClickRef, () => {
+    setSelected(null);
+    onChange?.(null);
+  });
+
+  const handleSelect = (index: number) => {
+    setSelected(index);
+    onChange?.(index);
+  };
+
+  const Separator = () => (
+    <div className="mx-1 h-[24px] w-[1.2px] bg-border" aria-hidden="true" />
+  );
+
+  return (
+    <div
+      ref={outsideClickRef}
+      className={cn(
+        "flex flex-wrap items-center gap-2 rounded-2xl border bg-background p-1 shadow-sm",
+        className
+      )}
+    >
+      {tabs.map((tab, index) => {
+        if (tab.type === "separator") {
+          return <Separator key={`separator-${index}`} />;
+        }
+
+        const Icon = tab.icon;
+        return (
+          <motion.button
+            key={tab.title}
+            variants={buttonVariants}
+            initial={false}
+            animate="animate"
+            custom={selected === index}
+            onClick={() => handleSelect(index)}
+            transition={transition}
+            className={cn(
+              "relative flex items-center rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-300",
+              selected === index
+                ? cn("bg-muted", activeColor)
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Icon size={20} />
+            <AnimatePresence initial={false}>
+              {selected === index && (
+                <motion.span
+                  variants={spanVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={transition}
+                  className="overflow-hidden"
+                >
+                  {tab.title}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+import { ReactNode } from "react";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
+
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+
+const BentoGrid = ({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) => {
+  return (
+    <div
+      className={cn(
+        "grid w-full auto-rows-[22rem] grid-cols-3 gap-4",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+};
+
+const BentoCard = ({
+  name,
+  className,
+  background,
+  Icon,
+  description,
+  href,
+  cta,
+}: {
+  name: string;
+  className: string;
+  background: ReactNode;
+  Icon: any;
+  description: string;
+  href: string;
+  cta: string;
+}) => (
+  <div
+    key={name}
+    className={cn(
+      "group relative col-span-3 flex flex-col justify-between overflow-hidden rounded-xl",
+      // light styles
+      "bg-white [box-shadow:0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)]",
+      // dark styles
+      "transform-gpu dark:bg-black dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
+      className,
+    )}
+  >
+    <div>{background}</div>
+    <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
+      <Icon className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />
+      <h3 className="text-xl font-semibold text-neutral-700 dark:text-neutral-300">
+        {name}
+      </h3>
+      <p className="max-w-lg text-neutral-400">{description}</p>
+    </div>
+
+    <div
+      className={cn(
+        "pointer-events-none absolute bottom-0 flex w-full translate-y-10 transform-gpu flex-row items-center p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100",
+      )}
+    >
+      <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
+        <a href={href}>
+          {cta}
+          <ArrowRightIcon className="ml-2 h-4 w-4" />
+        </a>
+      </Button>
+    </div>
+    <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:bg-black/[.03] group-hover:dark:bg-neutral-800/10" />
+  </div>
+);
+
+export { BentoCard, BentoGrid };
+
+
+
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, forwardRef } from 'react';
+import { Sun, Moon, X, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+// --- Utilities ---
+
+/**
+ * Combines multiple class names and merges Tailwind classes correctly.
+ */
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// --- Interfaces & Constants ---
+
+export interface Project {
+  id: string;
+  image: string;
+  title: string;
+}
+
+const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200";
+
+// --- Internal Components ---
+
+interface ProjectCardProps {
+  image: string;
+  title: string;
+  delay: number;
+  isVisible: boolean;
+  index: number;
+  totalCount: number;
+  onClick: () => void;
+  isSelected: boolean;
+}
+
+const ProjectCard = forwardRef<HTMLDivElement, ProjectCardProps>(
+  ({ image, title, delay, isVisible, index, totalCount, onClick, isSelected }, ref) => {
+    const middleIndex = (totalCount - 1) / 2;
+    const factor = totalCount > 1 ? (index - middleIndex) / middleIndex : 0;
+    
+    const rotation = factor * 25; 
+    const translationX = factor * 85; 
+    const translationY = Math.abs(factor) * 12;
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "absolute w-20 h-28 cursor-pointer group/card",
+          isSelected && "opacity-0",
+        )}
+        style={{
+          transform: isVisible
+            ? `translateY(calc(-100px + ${translationY}px)) translateX(${translationX}px) rotate(${rotation}deg) scale(1)`
+            : "translateY(0px) translateX(0px) rotate(0deg) scale(0.4)",
+          opacity: isSelected ? 0 : isVisible ? 1 : 0,
+          transition: `all 700ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
+          zIndex: 10 + index,
+          left: "-40px",
+          top: "-56px",
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+      >
+        <div className={cn(
+          "w-full h-full rounded-lg overflow-hidden shadow-xl bg-card border border-white/5 relative",
+          "transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          "group-hover/card:-translate-y-6 group-hover/card:shadow-2xl group-hover/card:shadow-accent/40 group-hover/card:ring-2 group-hover/card:ring-accent group-hover/card:scale-125"
+        )}>
+          <img 
+            src={image || PLACEHOLDER_IMAGE} 
+            alt={title} 
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+          <p className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] font-black uppercase tracking-tighter text-white truncate drop-shadow-md">
+            {title}
+          </p>
+        </div>
+      </div>
+    );
+  }
+);
+ProjectCard.displayName = "ProjectCard";
+
+interface ImageLightboxProps {
+  projects: Project[];
+  currentIndex: number;
+  isOpen: boolean;
+  onClose: () => void;
+  sourceRect: DOMRect | null;
+  onCloseComplete?: () => void;
+  onNavigate: (index: number) => void;
+}
+
+const ImageLightbox: React.FC<ImageLightboxProps> = ({
+  projects,
+  currentIndex,
+  isOpen,
+  onClose,
+  sourceRect,
+  onCloseComplete,
+  onNavigate,
+}) => {
+  const [animationPhase, setAnimationPhase] = useState<"initial" | "animating" | "complete">("initial");
+  const [isClosing, setIsClosing] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
+  const [internalIndex, setInternalIndex] = useState(currentIndex);
+  const [isSliding, setIsSliding] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const totalProjects = projects.length;
+  const hasNext = internalIndex < totalProjects - 1;
+  const hasPrev = internalIndex > 0;
+  const currentProject = projects[internalIndex];
+
+  useEffect(() => {
+    if (isOpen && currentIndex !== internalIndex && !isSliding) {
+      setIsSliding(true);
+      const timer = setTimeout(() => {
+        setInternalIndex(currentIndex);
+        setIsSliding(false);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [currentIndex, isOpen, internalIndex, isSliding]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setInternalIndex(currentIndex);
+      setIsSliding(false);
+    }
+  }, [isOpen, currentIndex]);
+
+  const navigateNext = useCallback(() => {
+    if (internalIndex >= totalProjects - 1 || isSliding) return;
+    onNavigate(internalIndex + 1);
+  }, [internalIndex, totalProjects, isSliding, onNavigate]);
+
+  const navigatePrev = useCallback(() => {
+    if (internalIndex <= 0 || isSliding) return;
+    onNavigate(internalIndex - 1);
+  }, [internalIndex, isSliding, onNavigate]);
+
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    onClose();
+    setTimeout(() => {
+      setIsClosing(false);
+      setShouldRender(false);
+      setAnimationPhase("initial");
+      onCloseComplete?.();
+    }, 500);
+  }, [onClose, onCloseComplete]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      if (e.key === "Escape") handleClose();
+      if (e.key === "ArrowRight") navigateNext();
+      if (e.key === "ArrowLeft") navigatePrev();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    if (isOpen) document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, handleClose, navigateNext, navigatePrev]);
+
+  useLayoutEffect(() => {
+    if (isOpen && sourceRect) {
+      setShouldRender(true);
+      setAnimationPhase("initial");
+      setIsClosing(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setAnimationPhase("animating");
+        });
+      });
+      const timer = setTimeout(() => {
+        setAnimationPhase("complete");
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, sourceRect]);
+
+  const handleDotClick = (idx: number) => {
+    if (isSliding || idx === internalIndex) return;
+    onNavigate(idx);
+  };
+
+  if (!shouldRender || !currentProject) return null;
+
+  const getInitialStyles = (): React.CSSProperties => {
+    if (!sourceRect) return {};
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const targetWidth = Math.min(800, viewportWidth - 64);
+    const targetHeight = Math.min(viewportHeight * 0.85, 600);
+    const targetX = (viewportWidth - targetWidth) / 2;
+    const targetY = (viewportHeight - targetHeight) / 2;
+    const scaleX = sourceRect.width / targetWidth;
+    const scaleY = sourceRect.height / targetHeight;
+    const scale = Math.max(scaleX, scaleY);
+    const translateX = sourceRect.left + sourceRect.width / 2 - (targetX + targetWidth / 2) + window.scrollX;
+    const translateY = sourceRect.top + sourceRect.height / 2 - (targetY + targetHeight / 2) + window.scrollY;
+    return {
+      transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
+      opacity: 0.5,
+      borderRadius: "12px",
+    };
+  };
+
+  const getFinalStyles = (): React.CSSProperties => ({
+    transform: "translate(0, 0) scale(1)",
+    opacity: 1,
+    borderRadius: "24px",
+  });
+
+  const currentStyles = animationPhase === "initial" && !isClosing ? getInitialStyles() : getFinalStyles();
+
+  return (
+    <div
+      className={cn("fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8")}
+      onClick={handleClose}
+      style={{
+        opacity: isClosing ? 0 : 1,
+        transition: "opacity 500ms cubic-bezier(0.16, 1, 0.3, 1)",
+      }}
+    >
+      <div
+        className="absolute inset-0 bg-background/90 backdrop-blur-2xl"
+        style={{
+          opacity: (animationPhase === "initial" && !isClosing) ? 0 : 1,
+          transition: "opacity 600ms cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      />
+      <button
+        onClick={(e) => { e.stopPropagation(); handleClose(); }}
+        className={cn(
+          "absolute top-6 right-6 z-50 w-12 h-12 flex items-center justify-center rounded-full bg-muted/30 backdrop-blur-xl border border-white/10 shadow-2xl text-foreground hover:bg-muted transition-all duration-300",
+        )}
+        style={{
+          opacity: animationPhase === "complete" && !isClosing ? 1 : 0,
+          transform: animationPhase === "complete" && !isClosing ? "translateY(0)" : "translateY(-30px)",
+          transition: "opacity 400ms ease-out 400ms, transform 500ms cubic-bezier(0.16, 1, 0.3, 1) 400ms",
+        }}
+      >
+        <X className="w-5 h-5" strokeWidth={2.5} />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); navigatePrev(); }}
+        disabled={!hasPrev || isSliding}
+        className={cn(
+          "absolute left-4 md:left-10 z-50 w-14 h-14 flex items-center justify-center rounded-full bg-muted/30 backdrop-blur-xl border border-white/10 text-foreground hover:scale-110 active:scale-95 transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none shadow-2xl",
+        )}
+        style={{
+          opacity: animationPhase === "complete" && !isClosing && hasPrev ? 1 : 0,
+          transform: animationPhase === "complete" && !isClosing ? "translateX(0)" : "translateX(-40px)",
+          transition: "opacity 400ms ease-out 600ms, transform 500ms cubic-bezier(0.16, 1, 0.3, 1) 600ms",
+        }}
+      >
+        <ChevronLeft className="w-6 h-6" strokeWidth={3} />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); navigateNext(); }}
+        disabled={!hasNext || isSliding}
+        className={cn(
+          "absolute right-4 md:right-10 z-50 w-14 h-14 flex items-center justify-center rounded-full bg-muted/30 backdrop-blur-xl border border-white/10 text-foreground hover:scale-110 active:scale-95 transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none shadow-2xl",
+        )}
+        style={{
+          opacity: animationPhase === "complete" && !isClosing && hasNext ? 1 : 0,
+          transform: animationPhase === "complete" && !isClosing ? "translateX(0)" : "translateX(40px)",
+          transition: "opacity 400ms ease-out 600ms, transform 500ms cubic-bezier(0.16, 1, 0.3, 1) 600ms",
+        }}
+      >
+        <ChevronRight className="w-6 h-6" strokeWidth={3} />
+      </button>
+      <div
+        ref={containerRef}
+        className="relative z-10 w-full max-w-4xl"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          ...currentStyles,
+          transform: isClosing ? "translate(0, 0) scale(0.92)" : currentStyles.transform,
+          transition: animationPhase === "initial" && !isClosing ? "none" : "transform 700ms cubic-bezier(0.16, 1, 0.3, 1), opacity 600ms ease-out, border-radius 700ms ease",
+          transformOrigin: "center center",
+        }}
+      >
+        <div className={cn("relative overflow-hidden rounded-[inherit] bg-card border border-white/10 shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)]")}>
+          <div className="relative overflow-hidden aspect-[4/3] md:aspect-[16/10]">
+            <div
+              className="flex w-full h-full transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+              style={{
+                transform: `translateX(-${internalIndex * 100}%)`,
+                transition: isSliding ? "transform 500ms cubic-bezier(0.16, 1, 0.3, 1)" : "none",
+              }}
+            >
+              {projects.map((project, idx) => (
+                <div key={project.id} className="min-w-full h-full relative">
+                  <img
+                    src={project.image || PLACEHOLDER_IMAGE}
+                    alt={project.title}
+                    className="w-full h-full object-cover select-none"
+                    onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE; }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40 pointer-events-none" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            className={cn("px-8 py-7 bg-card border-t border-white/5")}
+            style={{
+              opacity: animationPhase === "complete" && !isClosing ? 1 : 0,
+              transform: animationPhase === "complete" && !isClosing ? "translateY(0)" : "translateY(40px)",
+              transition: "opacity 500ms ease-out 500ms, transform 600ms cubic-bezier(0.16, 1, 0.3, 1) 500ms",
+            }}
+          >
+            <div className="flex items-center justify-between gap-6">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-2xl font-bold text-foreground tracking-tight truncate">{currentProject?.title}</h3>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted rounded-full border border-white/5">
+                    {projects.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleDotClick(idx)}
+                        className={cn("w-1.5 h-1.5 rounded-full transition-all duration-500", idx === internalIndex ? "bg-foreground scale-150" : "bg-muted-foreground/30 hover:bg-muted-foreground/60")}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">{internalIndex + 1} / {totalProjects}</p>
+                </div>
+              </div>
+              <button className={cn("flex items-center gap-2 px-6 py-3 text-sm font-bold uppercase tracking-widest text-primary-foreground bg-primary hover:brightness-110 rounded-xl shadow-lg shadow-primary/20 transition-all duration-300 hover:scale-105 active:scale-95")}>
+                <span>View Project</span>
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface AnimatedFolderProps {
+  title: string;
+  projects: Project[];
+  className?: string;
+  gradient?: string;
+}
+
+const AnimatedFolder: React.FC<AnimatedFolderProps> = ({ title, projects, className, gradient }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [sourceRect, setSourceRect] = useState<DOMRect | null>(null);
+  const [hiddenCardId, setHiddenCardId] = useState<string | null>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const previewProjects = projects.slice(0, 5);
+
+  const handleProjectClick = (project: Project, index: number) => {
+    const cardEl = cardRefs.current[index];
+    if (cardEl) setSourceRect(cardEl.getBoundingClientRect());
+    setSelectedIndex(index);
+    setHiddenCardId(project.id);
+  };
+
+  const handleCloseLightbox = () => { setSelectedIndex(null); setSourceRect(null); };
+  const handleCloseComplete = () => { setHiddenCardId(null); };
+  const handleNavigate = (newIndex: number) => { setSelectedIndex(newIndex); setHiddenCardId(projects[newIndex]?.id || null); };
+
+  const backBg = gradient || "linear-gradient(135deg, var(--folder-back) 0%, var(--folder-tab) 100%)";
+  const tabBg = gradient || "var(--folder-tab)";
+  const frontBg = gradient || "linear-gradient(135deg, var(--folder-front) 0%, var(--folder-back) 100%)";
+
+  return (
+    <>
+      <div
+        className={cn("relative flex flex-col items-center justify-center p-8 rounded-2xl cursor-pointer bg-card border border-border transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] hover:shadow-2xl hover:shadow-accent/20 hover:border-accent/40 group", className)}
+        style={{ minWidth: "280px", minHeight: "320px", perspective: "1200px", transform: isHovered ? "scale(1.04) rotate(-1.5deg)" : "scale(1) rotate(0deg)" }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div
+          className="absolute inset-0 rounded-2xl transition-opacity duration-700"
+          style={{ background: gradient ? `radial-gradient(circle at 50% 70%, ${gradient.match(/#[a-fA-F0-9]{3,6}/)?.[0] || 'var(--accent)'} 0%, transparent 70%)` : "radial-gradient(circle at 50% 70%, var(--accent) 0%, transparent 70%)", opacity: isHovered ? 0.12 : 0 }}
+        />
+        <div className="relative flex items-center justify-center mb-4" style={{ height: "160px", width: "200px" }}>
+          <div className="absolute w-32 h-24 rounded-lg shadow-md border border-white/10" style={{ background: backBg, filter: gradient ? "brightness(0.9)" : "none", transformOrigin: "bottom center", transform: isHovered ? "rotateX(-20deg) scaleY(1.05)" : "rotateX(0deg) scaleY(1)", transition: "transform 700ms cubic-bezier(0.16, 1, 0.3, 1)", zIndex: 10 }} />
+          <div className="absolute w-12 h-4 rounded-t-md border-t border-x border-white/10" style={{ background: tabBg, filter: gradient ? "brightness(0.85)" : "none", top: "calc(50% - 48px - 12px)", left: "calc(50% - 64px + 16px)", transformOrigin: "bottom center", transform: isHovered ? "rotateX(-30deg) translateY(-3px)" : "rotateX(0deg) translateY(0)", transition: "transform 700ms cubic-bezier(0.16, 1, 0.3, 1)", zIndex: 10 }} />
+          <div className="absolute" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 20 }}>
+            {previewProjects.map((project, index) => (
+              <ProjectCard key={project.id} ref={(el) => { cardRefs.current[index] = el; }} image={project.image} title={project.title} delay={index * 50} isVisible={isHovered} index={index} totalCount={previewProjects.length} onClick={() => handleProjectClick(project, index)} isSelected={hiddenCardId === project.id} />
+            ))}
+          </div>
+          <div className="absolute w-32 h-24 rounded-lg shadow-lg border border-white/20" style={{ background: frontBg, top: "calc(50% - 48px + 4px)", transformOrigin: "bottom center", transform: isHovered ? "rotateX(35deg) translateY(12px)" : "rotateX(0deg) translateY(0)", transition: "transform 700ms cubic-bezier(0.16, 1, 0.3, 1)", zIndex: 30 }} />
+          <div className="absolute w-32 h-24 rounded-lg overflow-hidden pointer-events-none" style={{ top: "calc(50% - 48px + 4px)", background: "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 60%)", transformOrigin: "bottom center", transform: isHovered ? "rotateX(35deg) translateY(12px)" : "rotateX(0deg) translateY(0)", transition: "transform 700ms cubic-bezier(0.16, 1, 0.3, 1)", zIndex: 31 }} />
+        </div>
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-foreground mt-4 transition-all duration-500" style={{ transform: isHovered ? "translateY(2px)" : "translateY(0)", letterSpacing: isHovered ? "-0.01em" : "0" }}>{title}</h3>
+          <p className="text-sm font-medium text-muted-foreground transition-all duration-500" style={{ opacity: isHovered ? 0.8 : 1 }}>{projects.length} {projects.length === 1 ? 'project' : 'projects'}</p>
+        </div>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground/50 transition-all duration-500" style={{ opacity: isHovered ? 0 : 1, transform: isHovered ? "translateY(10px)" : "translateY(0)" }}>
+          <span>Hover</span>
+        </div>
+      </div>
+      <ImageLightbox projects={projects} currentIndex={selectedIndex ?? 0} isOpen={selectedIndex !== null} onClose={handleCloseLightbox} sourceRect={sourceRect} onCloseComplete={handleCloseComplete} onNavigate={handleNavigate} />
+    </>
+  );
+};
+
+// --- Portfolio Data & Main App ---
+
+const portfolioData = [
+  {
+    title: "Branding",
+    gradient: "linear-gradient(135deg, #e73827, #f85032)",
+    projects: [
+      { id: "b1", image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800", title: "Lumnia Identity" },
+      { id: "b2", image: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800", title: "Prism Collective" },
+      { id: "b3", image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&q=80&w=800", title: "Vertex Studio" },
+      { id: "b4", image: "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&q=80&w=800", title: "Aura Branding" },
+      { id: "b5", image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=800", title: "Zephyr Lab" },
+      { id: "b6", image: "https://images.unsplash.com/photo-1554446422-d05db23719d2?auto=format&fit=crop&q=80&w=800", title: "Origin Brand" },
+    ] as Project[]
+  },
+  {
+    title: "Web Design",
+    gradient: "linear-gradient(to right, #f7b733, #fc4a1a)",
+    projects: [
+      { id: "w1", image: "https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&q=80&w=800", title: "Nexus Platform" },
+      { id: "w2", image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800", title: "Echo Analytics" },
+      { id: "w3", image: "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&q=80&w=800", title: "Flow Systems" },
+      { id: "w4", image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=800", title: "Code Nest" },
+      { id: "w5", image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=800", title: "Dev Port" },
+    ] as Project[]
+  },
+  {
+    title: "UI/UX Design",
+    gradient: "linear-gradient(135deg, #00c6ff, #0072ff)",
+    projects: [
+      { id: "u1", image: "https://images.unsplash.com/photo-1586717791821-3f44a563eb4c?auto=format&fit=crop&q=80&w=800", title: "Crypto Wallet" },
+      { id: "u2", image: "https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&q=80&w=800", title: "Social Connect" },
+      { id: "u3", image: "https://images.unsplash.com/photo-1522542550221-31fd19fe4af0?auto=format&fit=crop&q=80&w=800", title: "Health Tracker" },
+      { id: "u4", image: "https://images.unsplash.com/photo-1559028012-481c04fa702d?auto=format&fit=crop&q=80&w=800", title: "Finance Dash" },
+      { id: "u5", image: "https://images.unsplash.com/photo-1541462608141-ad4d4f942177?auto=format&fit=crop&q=80&w=800", title: "UX Wireframe" },
+    ] as Project[]
+  },
+  {
+    title: "Photography",
+    gradient: "linear-gradient(to right, #414345, #232526)",
+    projects: [
+      { id: "p1", image: "https://images.unsplash.com/photo-1493863641943-9b68992a8d07?auto=format&fit=crop&q=80&w=800", title: "Urban Rhythms" },
+      { id: "p2", image: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&q=80&w=800", title: "Natural States" },
+      { id: "p3", image: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=800", title: "Silent Woods" },
+    ] as Project[]
+  },
+  {
+    title: "Illustration",
+    gradient: "linear-gradient(135deg, #8e2de2, #4a00e0)",
+    projects: [
+      { id: "i1", image: "https://images.unsplash.com/photo-1618335829737-2228915674e0?auto=format&fit=crop&q=80&w=800", title: "Digital Flora" },
+      { id: "i2", image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=800", title: "Neon Nights" },
+      { id: "i3", image: "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?auto=format&fit=crop&q=80&w=800", title: "Abstract Worlds" },
+    ] as Project[]
+  },
+  {
+    title: "Motion",
+    gradient: "linear-gradient(135deg, #f80759, #bc4e9c)",
+    projects: [
+      { id: "m1", image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=800", title: "3D Sequences" },
+      { id: "m2", image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800", title: "Glitch Art" },
+      { id: "m3", image: "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&q=80&w=800", title: "Tech Loops" },
+    ] as Project[]
+  }
+];
+
+export default function App() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setIsDark(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  const toggleTheme = () => setIsDark(!isDark);
+
+  return (
+    <main className="min-h-screen bg-background text-foreground transition-colors duration-500 selection:bg-accent/30 selection:text-accent-foreground">
+      <header className="sticky top-0 z-40 w-full bg-background/80 backdrop-blur-xl border-b border-border transition-colors duration-500">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-end">
+          <button 
+            onClick={toggleTheme}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted/50 hover:bg-muted transition-colors border border-border"
+            aria-label="Toggle Theme"
+          >
+            {isDark ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-indigo-600" />}
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto pt-20 px-6 text-center">
+        <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          Design <span className="text-primary italic">Portfolio</span>
+        </h1>
+        <p className="text-muted-foreground text-lg max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+          An interactive catalog of creative work. Hover over folders to reveal project previews.
+        </p>
+      </div>
+
+      <section className="max-w-7xl mx-auto px-6 pt-16 pb-32">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 justify-items-center">
+          {portfolioData.map((folder, index) => (
+            <div 
+              key={folder.title} 
+              className="w-full animate-in fade-in slide-in-from-bottom-8 duration-700" 
+              style={{ animationDelay: `${200 + index * 100}ms` }}
+            >
+              <AnimatedFolder 
+                title={folder.title} 
+                projects={folder.projects} 
+                gradient={folder.gradient}
+                className="w-full"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+
+import React from "react";
+
+import { cn } from "@/lib/utils";
+interface RainbowButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {}
+
+export function RainbowButton({
+  children,
+  className,
+  ...props
+}: RainbowButtonProps) {
+  return (
+    <button
+      className={cn(
+        "group relative inline-flex h-11 animate-rainbow cursor-pointer items-center justify-center rounded-xl border-0 bg-[length:200%] px-8 py-2 font-medium text-primary-foreground transition-colors [background-clip:padding-box,border-box,border-box] [background-origin:border-box] [border:calc(0.08*1rem)_solid_transparent] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+
+        // before styles
+        "before:absolute before:bottom-[-20%] before:left-1/2 before:z-0 before:h-1/5 before:w-3/5 before:-translate-x-1/2 before:animate-rainbow before:bg-[linear-gradient(90deg,hsl(var(--color-1)),hsl(var(--color-5)),hsl(var(--color-3)),hsl(var(--color-4)),hsl(var(--color-2)))] before:bg-[length:200%] before:[filter:blur(calc(0.8*1rem))]",
+
+        // light mode colors
+        "bg-[linear-gradient(#121213,#121213),linear-gradient(#121213_50%,rgba(18,18,19,0.6)_80%,rgba(18,18,19,0)),linear-gradient(90deg,hsl(var(--color-1)),hsl(var(--color-5)),hsl(var(--color-3)),hsl(var(--color-4)),hsl(var(--color-2)))]",
+
+        // dark mode colors
+        "dark:bg-[linear-gradient(#fff,#fff),linear-gradient(#fff_50%,rgba(255,255,255,0.6)_80%,rgba(0,0,0,0)),linear-gradient(90deg,hsl(var(--color-1)),hsl(var(--color-5)),hsl(var(--color-3)),hsl(var(--color-4)),hsl(var(--color-2)))]",
+
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+import { Check, X } from "lucide-react";
+
+// --- MATERIAL DESIGN 3 PHYSICS ---
+const SWITCH_THEME = {
+  "--ease-spring": "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+} as React.CSSProperties;
+
+const switchVariants = cva(
+  "peer inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        primary: "peer-checked:bg-primary peer-checked:border-primary",
+        destructive: "peer-checked:bg-destructive peer-checked:border-destructive",
+      },
+      size: {
+        default: "h-8 w-[52px]", // Standard M3
+        sm: "h-6 w-10",          // Compact
+      },
+    },
+    defaultVariants: {
+      variant: "primary",
+      size: "default",
+    },
+  }
+);
+
+// --- AUDIO HAPTIC ENGINE ---
+const playHapticFeedback = (type: "heavy" | "light" | "none") => {
+  if (type === "none" || typeof window === "undefined") return;
+
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+
+    if (type === "heavy") {
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(180, now);
+      oscillator.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+      
+      gainNode.gain.setValueAtTime(0.4, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+      
+      oscillator.start(now);
+      oscillator.stop(now + 0.15);
+    } else {
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(800, now);
+      
+      gainNode.gain.setValueAtTime(0.15, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+      
+      oscillator.start(now);
+      oscillator.stop(now + 0.08);
+    }
+  } catch (e) {
+    console.error("Audio haptic failed", e);
+  }
+};
+
+export interface SwitchProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
+    VariantProps<typeof switchVariants> {
+  onCheckedChange?: (checked: boolean) => void;
+  showIcons?: boolean;
+  checkedIcon?: React.ReactNode;   // Custom Icon for On State
+  uncheckedIcon?: React.ReactNode; // Custom Icon for Off State
+  haptic?: "heavy" | "light" | "none";
+}
+
+const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
+  ({ 
+    className, 
+    size, 
+    variant, 
+    checked, 
+    defaultChecked, 
+    onCheckedChange, 
+    showIcons = false, 
+    checkedIcon, 
+    uncheckedIcon, 
+    haptic = "none", 
+    style, 
+    disabled, 
+    ...props 
+  }, ref) => {
+    const [isChecked, setIsChecked] = React.useState(defaultChecked ?? false);
+    const [isPressed, setIsPressed] = React.useState(false);
+    const [isHovered, setIsHovered] = React.useState(false);
+
+    React.useEffect(() => {
+      if (checked !== undefined) {
+        setIsChecked(checked);
+      }
+    }, [checked]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (disabled) return;
+      const newValue = e.target.checked;
+      
+      playHapticFeedback(haptic);
+
+      if (checked === undefined) {
+        setIsChecked(newValue);
+      }
+      onCheckedChange?.(newValue);
+    };
+
+    // Size Calcs
+    const isSmall = size === "sm";
+    const translateDist = isSmall ? "translate-x-[16px]" : "translate-x-[20px]";
+    const handleSizeUnchecked = isSmall ? "w-3 h-3 ml-[2px]" : "w-4 h-4 ml-[2px]";
+    const handleSizeChecked = isSmall ? "w-4 h-4" : "w-6 h-6";
+    const handleSizePressed = isSmall ? "w-5 h-5 -ml-[2px]" : "w-7 h-7 -ml-[2px]";
+    
+    // Icon sizing classes
+    const iconClasses = isSmall ? "w-2.5 h-2.5" : "w-3.5 h-3.5";
+
+    // Logic to determine if we render any icons
+    const shouldRenderIcons = showIcons || checkedIcon || uncheckedIcon;
+
+    return (
+      <label 
+        className={cn(
+          "group relative inline-flex items-center justify-center", 
+          disabled && "cursor-not-allowed opacity-50",
+          "min-w-[48px] min-h-[48px]" 
+        )}
+        style={{ ...SWITCH_THEME, ...style }}
+        onPointerDown={() => !disabled && setIsPressed(true)}
+        onPointerUp={() => setIsPressed(false)}
+        onPointerLeave={() => {
+          setIsPressed(false);
+          setIsHovered(false);
+        }}
+        onPointerEnter={() => !disabled && setIsHovered(true)}
+      >
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          ref={ref}
+          checked={isChecked}
+          onChange={handleChange}
+          disabled={disabled}
+          {...props}
+        />
+
+        {/* --- TRACK --- */}
+        <div
+          className={cn(
+            switchVariants({ variant, size }),
+            "bg-muted border-border",
+            "peer-checked:bg-primary peer-checked:border-primary",
+            className
+          )}
+        >
+          {/* --- HANDLE CONTAINER --- */}
+          <div
+            className={cn(
+              "pointer-events-none block h-full w-full transition-all duration-300 ease-[var(--ease-spring)]",
+              isChecked ? translateDist : "translate-x-0"
+            )}
+          >
+            {/* --- HANDLE --- */}
+            <div
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 shadow-sm transition-all duration-300 flex items-center justify-center rounded-full left-[2px]",
+                
+                isChecked 
+                  ? "bg-primary-foreground" 
+                  : "bg-foreground text-muted",
+
+                isChecked && variant === "primary" && "text-primary",
+                isChecked && variant === "destructive" && "text-destructive",
+                
+                isPressed 
+                  ? handleSizePressed
+                  : isChecked || (shouldRenderIcons && !isSmall)
+                    ? handleSizeChecked
+                    : handleSizeUnchecked
+              )}
+            >
+              {/* --- ICONS RENDERING --- */}
+              {shouldRenderIcons && (
+                <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                    
+                    {/* CHECKED STATE ICON */}
+                    <div className={cn(
+                        "absolute inset-0 flex items-center justify-center transition-all duration-300",
+                        isChecked ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-50 -rotate-45"
+                    )}>
+                        {checkedIcon ? (
+                             // If custom icon, render it. 
+                             // We don't force size classes on custom nodes to allow flexibility, 
+                             // but we provide a wrapper that centers it.
+                             checkedIcon
+                        ) : (
+                             <Check className={iconClasses} strokeWidth={4} />
+                        )}
+                    </div>
+
+                    {/* UNCHECKED STATE ICON */}
+                    <div className={cn(
+                        "absolute inset-0 flex items-center justify-center transition-all duration-300 text-muted-foreground",
+                        !isChecked ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-50 rotate-45"
+                    )}>
+                        {uncheckedIcon ? (
+                            uncheckedIcon
+                        ) : (
+                            <X className={iconClasses} strokeWidth={4} />
+                        )}
+                    </div>
+                </div>
+              )}
+            </div>
+
+            {/* --- HALO --- */}
+            <div 
+                className={cn(
+                    "absolute top-1/2 left-[2px] -translate-y-1/2 -translate-x-1/2 rounded-full pointer-events-none transition-all duration-200",
+                    isSmall ? "w-8 h-8" : "w-10 h-10",
+                    isChecked 
+                      ? (variant === 'destructive' ? "bg-destructive" : "bg-primary") 
+                      : "bg-foreground",
+                    isPressed ? "opacity-10 scale-100" : isHovered ? "opacity-5 scale-100" : "opacity-0 scale-50",
+                    isChecked ? "left-[14px]" : (shouldRenderIcons && !isSmall) ? "left-[14px]" : "left-[10px]",
+                    isSmall && (isChecked ? "left-[10px]" : "left-[8px]")
+                )}
+            />
+          </div>
+        </div>
+      </label>
+    );
+  }
+);
+Switch.displayName = "Switch";
+
+export { Switch };
+
+
+"use client"
+
+import { useState } from "react"
+import { Moon, Sun } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface ThemeToggleProps {
+  className?: string
+}
+
+export function ThemeToggle({ className }: ThemeToggleProps) {
+  const [isDark, setIsDark] = useState(true)
+
+  // next-themes
+  // const { resolvedTheme, setTheme } = useTheme()
+  // const isDark = resolvedTheme === "dark"
+  // onClick={() => setTheme(isDark ? "light" : "dark")}
+
+  return (
+    <div
+      className={cn(
+        "flex w-16 h-8 p-1 rounded-full cursor-pointer transition-all duration-300",
+        isDark 
+          ? "bg-zinc-950 border border-zinc-800" 
+          : "bg-white border border-zinc-200",
+        className
+      )}
+      onClick={() => setIsDark(!isDark)}
+      role="button"
+      tabIndex={0}
+    >
+      <div className="flex justify-between items-center w-full">
+        <div
+          className={cn(
+            "flex justify-center items-center w-6 h-6 rounded-full transition-transform duration-300",
+            isDark 
+              ? "transform translate-x-0 bg-zinc-800" 
+              : "transform translate-x-8 bg-gray-200"
+          )}
+        >
+          {isDark ? (
+            <Moon 
+              className="w-4 h-4 text-white" 
+              strokeWidth={1.5}
+            />
+          ) : (
+            <Sun 
+              className="w-4 h-4 text-gray-700" 
+              strokeWidth={1.5}
+            />
+          )}
+        </div>
+        <div
+          className={cn(
+            "flex justify-center items-center w-6 h-6 rounded-full transition-transform duration-300",
+            isDark 
+              ? "bg-transparent" 
+              : "transform -translate-x-8"
+          )}
+        >
+          {isDark ? (
+            <Sun 
+              className="w-4 h-4 text-gray-500" 
+              strokeWidth={1.5}
+            />
+          ) : (
+            <Moon 
+              className="w-4 h-4 text-black" 
+              strokeWidth={1.5}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+import React, { CSSProperties } from "react";
+
+import { cn } from "@/lib/utils";
+
+export interface ShimmerButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  shimmerColor?: string;
+  shimmerSize?: string;
+  borderRadius?: string;
+  shimmerDuration?: string;
+  background?: string;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+const ShimmerButton = React.forwardRef<HTMLButtonElement, ShimmerButtonProps>(
+  (
+    {
+      shimmerColor = "#ffffff",
+      shimmerSize = "0.05em",
+      shimmerDuration = "3s",
+      borderRadius = "100px",
+      background = "rgba(0, 0, 0, 1)",
+      className,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
+    return (
+      <button
+        style={
+          {
+            "--spread": "90deg",
+            "--shimmer-color": shimmerColor,
+            "--radius": borderRadius,
+            "--speed": shimmerDuration,
+            "--cut": shimmerSize,
+            "--bg": background,
+          } as CSSProperties
+        }
+        className={cn(
+          "group relative z-0 flex cursor-pointer items-center justify-center overflow-hidden whitespace-nowrap border border-white/10 px-6 py-3 text-white [background:var(--bg)] [border-radius:var(--radius)] dark:text-black",
+          "transform-gpu transition-transform duration-300 ease-in-out active:translate-y-px",
+          className,
+        )}
+        ref={ref}
+        {...props}
+      >
+        {/* spark container */}
+        <div
+          className={cn(
+            "-z-30 blur-[2px]",
+            "absolute inset-0 overflow-visible [container-type:size]",
+          )}
+        >
+          {/* spark */}
+          <div className="absolute inset-0 h-[100cqh] animate-shimmer-slide [aspect-ratio:1] [border-radius:0] [mask:none]">
+            {/* spark before */}
+            <div className="animate-spin-around absolute -inset-full w-auto rotate-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))] [translate:0_0]" />
+          </div>
+        </div>
+        {children}
+
+        {/* Highlight */}
+        <div
+          className={cn(
+            "insert-0 absolute size-full",
+
+            "rounded-2xl px-4 py-1.5 text-sm font-medium shadow-[inset_0_-8px_10px_#ffffff1f]",
+
+            // transition
+            "transform-gpu transition-all duration-300 ease-in-out",
+
+            // on hover
+            "group-hover:shadow-[inset_0_-6px_10px_#ffffff3f]",
+
+            // on click
+            "group-active:shadow-[inset_0_-10px_10px_#ffffff3f]",
+          )}
+        />
+
+        {/* backdrop */}
+        <div
+          className={cn(
+            "absolute -z-20 [background:var(--bg)] [border-radius:var(--radius)] [inset:var(--cut)]",
+          )}
+        />
+      </button>
+    );
+  },
+);
+
+ShimmerButton.displayName = "ShimmerButton";
+
+export { ShimmerButton };
+
+"use client";
+
+import { memo, useCallback, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
+import { animate } from "motion/react";
+
+interface GlowingEffectProps {
+  blur?: number;
+  inactiveZone?: number;
+  proximity?: number;
+  spread?: number;
+  variant?: "default" | "white";
+  glow?: boolean;
+  className?: string;
+  disabled?: boolean;
+  movementDuration?: number;
+  borderWidth?: number;
+}
+const GlowingEffect = memo(
+  ({
+    blur = 0,
+    inactiveZone = 0.7,
+    proximity = 0,
+    spread = 20,
+    variant = "default",
+    glow = false,
+    className,
+    movementDuration = 2,
+    borderWidth = 1,
+    disabled = true,
+  }: GlowingEffectProps) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lastPosition = useRef({ x: 0, y: 0 });
+    const animationFrameRef = useRef<number>(0);
+
+    const handleMove = useCallback(
+      (e?: MouseEvent | { x: number; y: number }) => {
+        if (!containerRef.current) return;
+
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+
+        animationFrameRef.current = requestAnimationFrame(() => {
+          const element = containerRef.current;
+          if (!element) return;
+
+          const { left, top, width, height } = element.getBoundingClientRect();
+          const mouseX = e?.x ?? lastPosition.current.x;
+          const mouseY = e?.y ?? lastPosition.current.y;
+
+          if (e) {
+            lastPosition.current = { x: mouseX, y: mouseY };
+          }
+
+          const center = [left + width * 0.5, top + height * 0.5];
+          const distanceFromCenter = Math.hypot(
+            mouseX - center[0],
+            mouseY - center[1]
+          );
+          const inactiveRadius = 0.5 * Math.min(width, height) * inactiveZone;
+
+          if (distanceFromCenter < inactiveRadius) {
+            element.style.setProperty("--active", "0");
+            return;
+          }
+
+          const isActive =
+            mouseX > left - proximity &&
+            mouseX < left + width + proximity &&
+            mouseY > top - proximity &&
+            mouseY < top + height + proximity;
+
+          element.style.setProperty("--active", isActive ? "1" : "0");
+
+          if (!isActive) return;
+
+          const currentAngle =
+            parseFloat(element.style.getPropertyValue("--start")) || 0;
+          let targetAngle =
+            (180 * Math.atan2(mouseY - center[1], mouseX - center[0])) /
+              Math.PI +
+            90;
+
+          const angleDiff = ((targetAngle - currentAngle + 180) % 360) - 180;
+          const newAngle = currentAngle + angleDiff;
+
+          animate(currentAngle, newAngle, {
+            duration: movementDuration,
+            ease: [0.16, 1, 0.3, 1],
+            onUpdate: (value) => {
+              element.style.setProperty("--start", String(value));
+            },
+          });
+        });
+      },
+      [inactiveZone, proximity, movementDuration]
+    );
+
+    useEffect(() => {
+      if (disabled) return;
+
+      const handleScroll = () => handleMove();
+      const handlePointerMove = (e: PointerEvent) => handleMove(e);
+
+      window.addEventListener("scroll", handleScroll, { passive: true });
+      document.body.addEventListener("pointermove", handlePointerMove, {
+        passive: true,
+      });
+
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        window.removeEventListener("scroll", handleScroll);
+        document.body.removeEventListener("pointermove", handlePointerMove);
+      };
+    }, [handleMove, disabled]);
+
+    return (
+      <>
+        <div
+          className={cn(
+            "pointer-events-none absolute -inset-px hidden rounded-[inherit] border opacity-0 transition-opacity",
+            glow && "opacity-100",
+            variant === "white" && "border-white",
+            disabled && "!block"
+          )}
+        />
+        <div
+          ref={containerRef}
+          style={
+            {
+              "--blur": `${blur}px`,
+              "--spread": spread,
+              "--start": "0",
+              "--active": "0",
+              "--glowingeffect-border-width": `${borderWidth}px`,
+              "--repeating-conic-gradient-times": "5",
+              "--gradient":
+                variant === "white"
+                  ? `repeating-conic-gradient(
+                  from 236.84deg at 50% 50%,
+                  var(--black),
+                  var(--black) calc(25% / var(--repeating-conic-gradient-times))
+                )`
+                  : `radial-gradient(circle, #dd7bbb 10%, #dd7bbb00 20%),
+                radial-gradient(circle at 40% 40%, #d79f1e 5%, #d79f1e00 15%),
+                radial-gradient(circle at 60% 60%, #5a922c 10%, #5a922c00 20%), 
+                radial-gradient(circle at 40% 60%, #4c7894 10%, #4c789400 20%),
+                repeating-conic-gradient(
+                  from 236.84deg at 50% 50%,
+                  #dd7bbb 0%,
+                  #d79f1e calc(25% / var(--repeating-conic-gradient-times)),
+                  #5a922c calc(50% / var(--repeating-conic-gradient-times)), 
+                  #4c7894 calc(75% / var(--repeating-conic-gradient-times)),
+                  #dd7bbb calc(100% / var(--repeating-conic-gradient-times))
+                )`,
+            } as React.CSSProperties
+          }
+          className={cn(
+            "pointer-events-none absolute inset-0 rounded-[inherit] opacity-100 transition-opacity",
+            glow && "opacity-100",
+            blur > 0 && "blur-[var(--blur)] ",
+            className,
+            disabled && "!hidden"
+          )}
+        >
+          <div
+            className={cn(
+              "glow",
+              "rounded-[inherit]",
+              'after:content-[""] after:rounded-[inherit] after:absolute after:inset-[calc(-1*var(--glowingeffect-border-width))]',
+              "after:[border:var(--glowingeffect-border-width)_solid_transparent]",
+              "after:[background:var(--gradient)] after:[background-attachment:fixed]",
+              "after:opacity-[var(--active)] after:transition-opacity after:duration-300",
+              "after:[mask-clip:padding-box,border-box]",
+              "after:[mask-composite:intersect]",
+              "after:[mask-image:linear-gradient(#0000,#0000),conic-gradient(from_calc((var(--start)-var(--spread))*1deg),#00000000_0deg,#fff,#00000000_calc(var(--spread)*2deg))]"
+            )}
+          />
+        </div>
+      </>
+    );
+  }
+);
+
+GlowingEffect.displayName = "GlowingEffect";
+
+export { GlowingEffect };
+
+
+
+"use client";
+import {
+  useMotionValueEvent,
+  useScroll,
+  useTransform,
+  motion,
+} from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+
+interface TimelineEntry {
+  title: string;
+  content: React.ReactNode;
+}
+
+export const Timeline = ({ data }: { data: TimelineEntry[] }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setHeight(rect.height);
+    }
+  }, [ref]);
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start 10%", "end 50%"],
+  });
+
+  const heightTransform = useTransform(scrollYProgress, [0, 1], [0, height]);
+  const opacityTransform = useTransform(scrollYProgress, [0, 0.1], [0, 1]);
+
+  return (
+    <div
+      className="w-full bg-white dark:bg-neutral-950 font-sans md:px-10"
+      ref={containerRef}
+    >
+      <div className="max-w-7xl mx-auto py-20 px-4 md:px-8 lg:px-10">
+        <h2 className="text-lg md:text-4xl mb-4 text-black dark:text-white max-w-4xl">
+          Changelog from my journey
+        </h2>
+        <p className="text-neutral-700 dark:text-neutral-300 text-sm md:text-base max-w-sm">
+          I&apos;ve been working on Aceternity for the past 2 years. Here&apos;s
+          a timeline of my journey.
+        </p>
+      </div>
+
+      <div ref={ref} className="relative max-w-7xl mx-auto pb-20">
+        {data.map((item, index) => (
+          <div
+            key={index}
+            className="flex justify-start pt-10 md:pt-40 md:gap-10"
+          >
+            <div className="sticky flex flex-col md:flex-row z-40 items-center top-40 self-start max-w-xs lg:max-w-sm md:w-full">
+              <div className="h-10 absolute left-3 md:left-3 w-10 rounded-full bg-white dark:bg-black flex items-center justify-center">
+                <div className="h-4 w-4 rounded-full bg-neutral-200 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 p-2" />
+              </div>
+              <h3 className="hidden md:block text-xl md:pl-20 md:text-5xl font-bold text-neutral-500 dark:text-neutral-500 ">
+                {item.title}
+              </h3>
+            </div>
+
+            <div className="relative pl-20 pr-4 md:pl-4 w-full">
+              <h3 className="md:hidden block text-2xl mb-4 text-left font-bold text-neutral-500 dark:text-neutral-500">
+                {item.title}
+              </h3>
+              {item.content}{" "}
+            </div>
+          </div>
+        ))}
+        <div
+          style={{
+            height: height + "px",
+          }}
+          className="absolute md:left-8 left-8 top-0 overflow-hidden w-[2px] bg-[linear-gradient(to_bottom,var(--tw-gradient-stops))] from-transparent from-[0%] via-neutral-200 dark:via-neutral-700 to-transparent to-[99%]  [mask-image:linear-gradient(to_bottom,transparent_0%,black_10%,black_90%,transparent_100%)] "
+        >
+          <motion.div
+            style={{
+              height: heightTransform,
+              opacity: opacityTransform,
+            }}
+            className="absolute inset-x-0 top-0  w-[2px] bg-gradient-to-t from-purple-500 via-blue-500 to-transparent from-[0%] via-[10%] rounded-full"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
