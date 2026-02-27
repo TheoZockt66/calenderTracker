@@ -20,7 +20,7 @@ export async function GET() {
 // POST /api/keys - Create a new tracking key
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { name, color, category_id, calendar_id } = body;
+  const { name, search_key, color, category_id, calendar_id } = body;
 
   if (!name) {
     return NextResponse.json(
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     .from("tracking_keys")
     .insert({
       name,
+      search_key: search_key || name,
       color: color || "#000000",
       category_id: category_id || null,
       calendar_id: calendar_id || null,
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/keys - Update a tracking key
 export async function PUT(request: NextRequest) {
   const body = await request.json();
-  const { id, name, color, category_id, calendar_id } = body;
+  const { id, name, search_key, color, category_id, calendar_id } = body;
 
   if (!id) {
     return NextResponse.json({ error: "ID is required" }, { status: 400 });
@@ -60,7 +61,7 @@ export async function PUT(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("tracking_keys")
-    .update({ name, color, category_id, calendar_id })
+    .update({ name, search_key, color, category_id, calendar_id })
     .eq("id", id)
     .select()
     .single();

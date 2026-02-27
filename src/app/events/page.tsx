@@ -5,7 +5,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
-import { MOCK_EVENTS, MOCK_KEYS, formatMinutes } from "@/lib/mock-data";
+import { formatMinutes } from "@/lib/mock-data";
+import type { TrackedEvent, TrackingKey } from "@/lib/types";
 import { GlowingEffect } from "@/components/GlowingEffect";
 import { EmptyState } from "@/components/EmptyState";
 import { Switch } from "@/components/ui/Switch";
@@ -29,8 +30,8 @@ function formatTime(dateStr: string): string {
   });
 }
 
-function groupByDate(events: typeof MOCK_EVENTS) {
-  const groups: Map<string, typeof MOCK_EVENTS> = new Map();
+function groupByDate(events: TrackedEvent[]) {
+  const groups: Map<string, TrackedEvent[]> = new Map();
   for (const event of events) {
     if (!groups.has(event.event_date)) groups.set(event.event_date, []);
     groups.get(event.event_date)!.push(event);
@@ -43,18 +44,40 @@ export default function EventsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  const [events, setEvents] = useState<TrackedEvent[]>([]);
+  const [keys, setKeys] = useState<TrackingKey[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/");
     }
   }, [status, router]);
 
+  useEffect(() => {
+    if (session) {
+      Promise.all([
+        fetch("/api/events").then((r) => (r.ok ? r.json() : [])),
+        fetch("/api/keys").then((r) => (r.ok ? r.json() : [])),
+      ])
+        .then(([eventsData, keysData]) => {
+          setEvents(eventsData || []);
+          setKeys(keysData || []);
+        })
+        .catch(() => {
+          setEvents([]);
+          setKeys([]);
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [session]);
+
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState<string>("all");
   const [gpmOnly, setGpmOnly] = useState(false);
 
   const filteredEvents = useMemo(() => {
-    return MOCK_EVENTS.filter((event) => {
+    return events.filter((event) => {
       const matchesSearch = event.summary
         .toLowerCase()
         .includes(search.toLowerCase());
@@ -63,7 +86,7 @@ export default function EventsPage() {
       const matchesGpm = !gpmOnly || event.key_name === "GPM";
       return matchesSearch && matchesKey && matchesGpm;
     });
-  }, [search, selectedKey, gpmOnly]);
+  }, [search, selectedKey, gpmOnly, events]);
 
   const groupedEvents = useMemo(
     () => groupByDate(filteredEvents),
@@ -78,7 +101,7 @@ export default function EventsPage() {
     );
   }, [filteredEvents]);
 
-  if (status === "loading") {
+  if (status === "loading" || loading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <Loader2 size={32} className="animate-spin" style={{ color: "var(--app-text-muted)" }} />
@@ -147,7 +170,7 @@ export default function EventsPage() {
                 style={{ width: "auto", minWidth: "150px" }}
               >
                 <option value="all">{t("events.allKeys")}</option>
-                {MOCK_KEYS.map((key) => (
+                {keys.map((key) => (
                   <option key={key.id} value={key.id}>
                     {key.name}
                   </option>

@@ -28,6 +28,7 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          search_key: string;
           color: string;
           category_id: string | null;
           calendar_id: string | null;
@@ -38,6 +39,7 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
+          search_key?: string;
           color?: string;
           category_id?: string | null;
           calendar_id?: string | null;
@@ -48,6 +50,7 @@ export interface Database {
         Update: {
           id?: string;
           name?: string;
+          search_key?: string;
           color?: string;
           category_id?: string | null;
           calendar_id?: string | null;
@@ -137,6 +140,7 @@ export interface Category {
 export interface TrackingKey {
   id: string;
   name: string;
+  search_key: string;
   color: string;
   category_id: string | null;
   calendar_id: string | null;

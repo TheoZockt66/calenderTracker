@@ -54,6 +54,7 @@ export default function NewKeyPage() {
   const [existingKeys, setExistingKeys] = useState<TrackingKey[]>([]);
 
   const [name, setName] = useState("");
+  const [searchKey, setSearchKey] = useState("");
   const [category, setCategory] = useState("");
   const [calendar, setCalendar] = useState("");
   const [tasks, setTasks] = useState<NewTask[]>([]);
@@ -210,11 +211,31 @@ export default function NewKeyPage() {
               <input
                 type="text"
                 className="input"
-                placeholder="z.B. GPM, Mathe III …"
+                placeholder="z.B. Geschäftsprozessmanagement, Mathe III …"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
               />
+              <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
+                {t("keys.nameHint")}
+              </p>
+            </div>
+
+            {/* Search Key */}
+            <div>
+              <label className="block text-[12px] font-semibold text-[var(--app-text-muted)] mb-1.5 uppercase tracking-wider">
+                {t("keys.searchKey")}
+              </label>
+              <input
+                type="text"
+                className="input"
+                placeholder="z.B. GPM, Mathe …"
+                value={searchKey}
+                onChange={(e) => setSearchKey(e.target.value)}
+              />
+              <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
+                {t("keys.searchKeyHint")}
+              </p>
             </div>
 
             {/* Category */}
@@ -485,7 +506,7 @@ export default function NewKeyPage() {
           </Link>
           <button
             className="btn-primary"
-            disabled={!name.trim()}
+            disabled={!name.trim() || !searchKey.trim()}
             onClick={async () => {
               try {
                 const res = await fetch("/api/keys", {
@@ -493,6 +514,7 @@ export default function NewKeyPage() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     name: name.trim(),
+                    search_key: searchKey.trim(),
                     color: autoColor,
                     category_id: category || null,
                     calendar_id: calendar || null,
@@ -504,7 +526,7 @@ export default function NewKeyPage() {
                 console.error("Error creating key:", err);
               }
             }}
-            style={{ opacity: name.trim() ? 1 : 0.5 }}
+            style={{ opacity: name.trim() && searchKey.trim() ? 1 : 0.5 }}
           >
             {t("common.create")}
           </button>

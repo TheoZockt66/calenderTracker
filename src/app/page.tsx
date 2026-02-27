@@ -12,6 +12,7 @@ import {
   Key,
   User,
   ArrowRight,
+  FolderOpen,
 } from "lucide-react";
 
 interface BentoCardProps {
@@ -168,20 +169,28 @@ export default function HomePage() {
               gridArea="2 / 4 / 3 / 7"
             />
             <BentoCard
-              icon={Settings}
-              title="Einstellungen"
-              description="Sprache, Dark Mode und mehr."
-              href="/settings"
-              cta="Einstellungen öffnen"
-              gridArea="3 / 1 / 4 / 3"
-            />
-            <BentoCard
               icon={Key}
               title="Keys verwalten"
               description="Tracking-Keys erstellen und organisieren."
               href="/keys"
               cta="Keys öffnen"
-              gridArea="3 / 3 / 4 / 7"
+              gridArea="3 / 1 / 4 / 4"
+            />
+            <BentoCard
+              icon={FolderOpen}
+              title="Kategorien"
+              description="Keys in Kategorien organisieren."
+              href="/categories"
+              cta="Kategorien öffnen"
+              gridArea="3 / 4 / 4 / 7"
+            />
+            <BentoCard
+              icon={Settings}
+              title="Einstellungen"
+              description="Sprache, Dark Mode und mehr."
+              href="/settings"
+              cta="Einstellungen öffnen"
+              gridArea="4 / 1 / 5 / 7"
             />
           </>
         ) : (
@@ -237,16 +246,22 @@ export default function HomePage() {
               gridArea="2 / 4 / 3 / 7"
             />
             <BentoCard
-              icon={Settings}
-              title="Einstellungen"
-              description="Sprache, Dark Mode und mehr."
-              gridArea="3 / 1 / 4 / 3"
-            />
-            <BentoCard
               icon={Key}
               title="Keys verwalten"
               description="Tracking-Keys erstellen und organisieren."
-              gridArea="3 / 3 / 4 / 7"
+              gridArea="3 / 1 / 4 / 4"
+            />
+            <BentoCard
+              icon={FolderOpen}
+              title="Kategorien"
+              description="Keys in Kategorien organisieren."
+              gridArea="3 / 4 / 4 / 7"
+            />
+            <BentoCard
+              icon={Settings}
+              title="Einstellungen"
+              description="Sprache, Dark Mode und mehr."
+              gridArea="4 / 1 / 5 / 7"
             />
           </>
         )}

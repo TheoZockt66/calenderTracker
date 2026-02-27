@@ -55,6 +55,18 @@ const translations: Record<Locale, Translations> = {
     "keys.deleteConfirm": "Möchtest du diesen Key wirklich löschen?",
     "keys.color": "Farbe",
     "keys.created": "Erstellt",
+    "keys.searchKey": "Tracking-Key",
+    "keys.searchKeyHint": "Dieser Begriff wird im Kalendertitel gesucht (z.B. \"GPM\" für Geschäftsprozessmanagement).",
+    "keys.nameHint": "Anzeigename für das Dashboard und die Übersicht.",
+    "keys.newKey": "Neuen Key erstellen",
+    "keys.newKeyDesc": "Definiere einen neuen Tracking-Key",
+    "keys.tasks": "Tasks",
+    "keys.addTask": "Task hinzufügen",
+    "keys.taskName": "Task-Name",
+    "keys.taskSearchTerm": "Suchbegriff",
+    "keys.tasksDesc": "Tasks werden verwendet um Events automatisch zuzuordnen.",
+    "keys.noTasks": "Noch keine Tasks angelegt",
+    "keys.taskSearchTermHint": "Events die diesen Begriff im Titel enthalten werden automatisch zugeordnet.",
 
     // Categories
     "categories.title": "Kategorien",
@@ -103,6 +115,14 @@ const translations: Record<Locale, Translations> = {
     "settings.installDesc": "CalendarTracker auf deinem Gerät installieren",
     "settings.german": "Deutsch",
     "settings.english": "Englisch",
+
+    // Tracking
+    "tracking.title": "Tracking",
+    "tracking.sync": "Jetzt synchronisieren",
+    "tracking.syncing": "Synchronisiere…",
+    "tracking.lastSync": "Letzte Sync",
+    "tracking.matched": "zugeordnet",
+    "tracking.newEvents": "Neue Events",
 
     // Common
     "common.save": "Speichern",
@@ -163,6 +183,18 @@ const translations: Record<Locale, Translations> = {
     "keys.deleteConfirm": "Do you really want to delete this key?",
     "keys.color": "Color",
     "keys.created": "Created",
+    "keys.searchKey": "Tracking Key",
+    "keys.searchKeyHint": "This term is searched in calendar event titles (e.g. \"GPM\" for Business Process Management).",
+    "keys.nameHint": "Display name for the dashboard and overview.",
+    "keys.newKey": "Create New Key",
+    "keys.newKeyDesc": "Define a new tracking key",
+    "keys.tasks": "Tasks",
+    "keys.addTask": "Add Task",
+    "keys.taskName": "Task Name",
+    "keys.taskSearchTerm": "Search Term",
+    "keys.tasksDesc": "Tasks are used to automatically match calendar events.",
+    "keys.noTasks": "No tasks created yet",
+    "keys.taskSearchTermHint": "Events containing this term in their title will be automatically matched.",
 
     // Categories
     "categories.title": "Categories",
@@ -211,6 +243,14 @@ const translations: Record<Locale, Translations> = {
     "settings.installDesc": "Install CalendarTracker on your device",
     "settings.german": "German",
     "settings.english": "English",
+
+    // Tracking
+    "tracking.title": "Tracking",
+    "tracking.sync": "Sync Now",
+    "tracking.syncing": "Syncing…",
+    "tracking.lastSync": "Last Sync",
+    "tracking.matched": "matched",
+    "tracking.newEvents": "New Events",
 
     // Common
     "common.save": "Save",

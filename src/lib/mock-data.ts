@@ -104,7 +104,8 @@ export function getKeyById(keyId: string): TrackingKey | undefined {
 export const MOCK_KEYS: TrackingKey[] = [
   {
     id: "key-1",
-    name: "GPM",
+    name: "Geschäftsprozessmanagement",
+    search_key: "GPM",
     color: "#000000",
     category_id: "cat-1",
     calendar_id: null,
@@ -114,7 +115,8 @@ export const MOCK_KEYS: TrackingKey[] = [
   },
   {
     id: "key-2",
-    name: "Mathe III",
+    name: "Mathematik III",
+    search_key: "Mathe III",
     color: "#404040",
     category_id: "cat-1",
     calendar_id: null,
@@ -125,6 +127,7 @@ export const MOCK_KEYS: TrackingKey[] = [
   {
     id: "key-3",
     name: "Datenbanken",
+    search_key: "Datenbanken",
     color: "#808080",
     category_id: "cat-1",
     calendar_id: null,
@@ -135,6 +138,7 @@ export const MOCK_KEYS: TrackingKey[] = [
   {
     id: "key-4",
     name: "Software Engineering",
+    search_key: "SE",
     color: "#1a1a1a",
     category_id: "cat-2",
     calendar_id: null,
@@ -145,6 +149,7 @@ export const MOCK_KEYS: TrackingKey[] = [
   {
     id: "key-5",
     name: "KI Grundlagen",
+    search_key: "KI",
     color: "#333333",
     category_id: "cat-2",
     calendar_id: null,
@@ -155,6 +160,7 @@ export const MOCK_KEYS: TrackingKey[] = [
   {
     id: "key-6",
     name: "Sport",
+    search_key: "Sport",
     color: "#595959",
     category_id: "cat-3",
     calendar_id: null,
@@ -165,6 +171,7 @@ export const MOCK_KEYS: TrackingKey[] = [
   {
     id: "key-7",
     name: "Lesen",
+    search_key: "Lesen",
     color: "#737373",
     category_id: "cat-3",
     calendar_id: null,

@@ -5,7 +5,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
-import { MOCK_CATEGORIES, getKeysForCategory, formatMinutes } from "@/lib/mock-data";
+import { formatMinutes } from "@/lib/mock-data";
+import type { Category, TrackingKey } from "@/lib/types";
 import { GlowCard } from "@/components/GlowCard";
 import { GlowingEffect } from "@/components/GlowingEffect";
 import { Modal } from "@/components/Modal";
@@ -28,11 +29,37 @@ export default function CategoriesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [keys, setKeys] = useState<TrackingKey[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/");
     }
   }, [status, router]);
+
+  useEffect(() => {
+    if (session) {
+      Promise.all([
+        fetch("/api/categories").then((r) => (r.ok ? r.json() : [])),
+        fetch("/api/keys").then((r) => (r.ok ? r.json() : [])),
+      ])
+        .then(([catData, keysData]) => {
+          setCategories(catData || []);
+          setKeys(keysData || []);
+        })
+        .catch(() => {
+          setCategories([]);
+          setKeys([]);
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [session]);
+
+  const getKeysForCategory = (categoryId: string): TrackingKey[] => {
+    return keys.filter((k) => k.category_id === categoryId);
+  };
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -42,7 +69,7 @@ export default function CategoriesPage() {
   const [catDescription, setCatDescription] = useState("");
 
   const handleEdit = (catId: string) => {
-    const cat = MOCK_CATEGORIES.find((c) => c.id === catId);
+    const cat = categories.find((c) => c.id === catId);
     if (cat) {
       setEditingCategory(catId);
       setCatName(cat.name);
@@ -51,11 +78,60 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleAddCategory = async () => {
+    if (!catName.trim()) return;
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: catName, description: catDescription || null }),
+      });
+      if (res.ok) {
+        const newCat = await res.json();
+        setCategories((prev) => [newCat, ...prev]);
+      }
+    } catch {}
+    setShowAddModal(false);
+    setCatName("");
+    setCatDescription("");
+  };
+
+  const handleUpdateCategory = async () => {
+    if (!editingCategory || !catName.trim()) return;
+    try {
+      const res = await fetch("/api/categories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingCategory, name: catName, description: catDescription || null }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      }
+    } catch {}
+    setShowEditModal(false);
+    setEditingCategory(null);
+    setCatName("");
+    setCatDescription("");
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!editingCategory) return;
+    try {
+      const res = await fetch(`/api/categories?id=${editingCategory}`, { method: "DELETE" });
+      if (res.ok) {
+        setCategories((prev) => prev.filter((c) => c.id !== editingCategory));
+      }
+    } catch {}
+    setShowEditModal(false);
+    setEditingCategory(null);
+  };
+
   const toggleExpand = (catId: string) => {
     setExpandedCategory(expandedCategory === catId ? null : catId);
   };
 
-  if (status === "loading") {
+  if (status === "loading" || loading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <Loader2 size={32} className="animate-spin" style={{ color: "var(--app-text-muted)" }} />
@@ -110,7 +186,7 @@ export default function CategoriesPage() {
           </div>
 
           {/* Category List */}
-          {MOCK_CATEGORIES.length === 0 ? (
+          {categories.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title={t("categories.noCategories")}
@@ -126,7 +202,7 @@ export default function CategoriesPage() {
             />
           ) : (
             <div className="space-y-4 animate-fade-up delay-1">
-              {MOCK_CATEGORIES.map((category) => {
+              {categories.map((category) => {
                 const keys = getKeysForCategory(category.id);
                 const totalMinutes = keys.reduce(
                   (sum, k) => sum + k.total_minutes,
@@ -280,8 +356,7 @@ export default function CategoriesPage() {
             <button
               className="btn-primary"
               onClick={() => {
-                // TODO: Supabase insert
-                setShowAddModal(false);
+                handleAddCategory();
               }}
             >
               {t("common.create")}
@@ -320,7 +395,7 @@ export default function CategoriesPage() {
             />
           </div>
           <div className="flex justify-between pt-2">
-            <button className="btn-danger">
+            <button className="btn-danger" onClick={handleDeleteCategory}>
               <Trash2 size={14} />
               {t("common.delete")}
             </button>
@@ -334,8 +409,7 @@ export default function CategoriesPage() {
               <button
                 className="btn-primary"
                 onClick={() => {
-                  // TODO: Supabase update
-                  setShowEditModal(false);
+                  handleUpdateCategory();
                 }}
               >
                 {t("common.save")}

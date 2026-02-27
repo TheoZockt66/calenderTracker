@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS categories (
 CREATE TABLE IF NOT EXISTS tracking_keys (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
+  search_key TEXT NOT NULL DEFAULT '',
   color TEXT NOT NULL DEFAULT '#000000',
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   calendar_id TEXT,

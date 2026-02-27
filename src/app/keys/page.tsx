@@ -20,6 +20,8 @@ import {
   ArrowRight,
   ArrowLeft,
   ListChecks,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 
 interface GoogleCalendar {
@@ -37,6 +39,15 @@ export default function KeysPage() {
   const [calendars, setCalendars] = useState<GoogleCalendar[]>([]);
   const [keys, setKeys] = useState<TrackingKey[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    newEvents: number;
+    matched: number;
+    totalCalendarEvents?: number;
+    error?: string;
+    debug?: string[];
+  } | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -46,25 +57,64 @@ export default function KeysPage() {
 
   useEffect(() => {
     if (session) {
-      // Load calendars
-      fetch("/api/calendar")
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
-        .then((data) => setCalendars(data.calendars || []))
-        .catch(() => setCalendars([]));
-
-      // Load keys from database
-      fetch("/api/keys")
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
-        .then((data) => setKeys(data || []))
-        .catch(() => setKeys([]));
-
-      // Load categories from database
-      fetch("/api/categories")
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
-        .then((data) => setCategories(data || []))
-        .catch(() => setCategories([]));
+      loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  const loadData = () => {
+    // Load calendars
+    fetch("/api/calendar")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => setCalendars(data.calendars || []))
+      .catch(() => setCalendars([]));
+
+    // Load keys from database
+    fetch("/api/keys")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => setKeys(data || []))
+      .catch(() => setKeys([]));
+
+    // Load categories from database
+    fetch("/api/categories")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => setCategories(data || []))
+      .catch(() => setCategories([]));
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    setShowDebug(false);
+    try {
+      const res = await fetch("/api/tracking", { method: "POST" });
+      const result = await res.json();
+      if (res.ok) {
+        setSyncResult({
+          newEvents: result.newEvents || 0,
+          matched: result.matched || 0,
+          totalCalendarEvents: result.totalCalendarEvents || 0,
+          debug: result.debug || [],
+        });
+        loadData();
+      } else {
+        setSyncResult({
+          newEvents: 0,
+          matched: 0,
+          error: result.error || "Unbekannter Fehler",
+          debug: result.debug || [result.details || "Keine Details"],
+        });
+      }
+    } catch (err) {
+      setSyncResult({
+        newEvents: 0,
+        matched: 0,
+        error: `Netzwerkfehler: ${err instanceof Error ? err.message : "Unbekannt"}`,
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string[]>([]);
@@ -164,10 +214,36 @@ export default function KeysPage() {
                 {t("keys.subtitle")}
               </p>
             </div>
-            <ButtonColorful
-              label={t("keys.addKey")}
-              onClick={() => router.push("/keys/new")}
-            />
+            <div className="flex items-center gap-3">
+              <button
+                className="btn-secondary"
+                onClick={handleSync}
+                disabled={syncing}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "13px",
+                  padding: "8px 14px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--app-border)",
+                  background: "var(--app-card)",
+                  cursor: syncing ? "wait" : "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                {syncing ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={15} />
+                )}
+                {syncing ? "Sync..." : "Sync"}
+              </button>
+              <ButtonColorful
+                label={t("keys.addKey")}
+                onClick={() => router.push("/keys/new")}
+              />
+            </div>
           </div>
         </div>
 
@@ -194,6 +270,77 @@ export default function KeysPage() {
             onChange={(vals) => setSelectedCategory(vals)}
           />
         </div>
+
+        {/* Sync Result Banner */}
+        {syncResult && (
+          <div
+            className="animate-fade-up rounded-2xl p-4 mb-6"
+            style={{
+              background: syncResult.error
+                ? "rgba(255, 59, 48, 0.12)"
+                : syncResult.newEvents > 0
+                  ? "rgba(52, 199, 89, 0.12)"
+                  : "var(--app-accent-soft)",
+              border: syncResult.error
+                ? "1px solid rgba(255, 59, 48, 0.25)"
+                : syncResult.newEvents > 0
+                  ? "1px solid rgba(52, 199, 89, 0.25)"
+                  : "1px solid var(--app-border)",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <CheckCircle2
+                size={18}
+                style={{
+                  color: syncResult.error
+                    ? "#FF3B30"
+                    : syncResult.newEvents > 0
+                      ? "#34C759"
+                      : "var(--app-text-muted)",
+                }}
+              />
+              <p style={{ fontSize: "13px", fontWeight: 500, flex: 1 }}>
+                {syncResult.error
+                  ? `Fehler: ${syncResult.error}`
+                  : syncResult.newEvents > 0
+                    ? `${syncResult.newEvents} neue Events zugeordnet (${syncResult.matched} Treffer)`
+                    : `Keine neuen Events. ${syncResult.totalCalendarEvents || 0} Kalender-Events gescannt, ${syncResult.matched || 0} Treffer.`}
+              </p>
+              <div className="flex items-center gap-2">
+                {syncResult.debug && syncResult.debug.length > 0 && (
+                  <button
+                    className="text-[11px] text-[var(--app-text-muted)] hover:text-[var(--app-text)] transition-colors underline"
+                    onClick={() => setShowDebug(!showDebug)}
+                  >
+                    {showDebug ? "Ausblenden" : "Details"}
+                  </button>
+                )}
+                <button
+                  className="text-[11px] text-[var(--app-text-muted)] hover:text-[var(--app-text)] transition-colors"
+                  onClick={() => setSyncResult(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            {showDebug && syncResult.debug && (
+              <div
+                className="mt-3 pt-3"
+                style={{
+                  borderTop: "1px solid var(--app-border)",
+                  fontSize: "11px",
+                  color: "var(--app-text-muted)",
+                  fontFamily: "monospace",
+                  lineHeight: "1.6",
+                }}
+              >
+                {syncResult.debug.map((line, i) => (
+                  <div key={i}>{line}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Keys Grid */}
         {filteredKeys.length === 0 ? (
@@ -268,11 +415,25 @@ export default function KeysPage() {
                         fontSize: "17px",
                         fontWeight: 700,
                         letterSpacing: "-0.01em",
-                        marginBottom: "4px",
+                        marginBottom: "2px",
                       }}
                     >
                       {key.name}
                     </h3>
+
+                    {/* Search Key */}
+                    {key.search_key && key.search_key !== key.name && (
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--app-text-muted)",
+                          marginBottom: "2px",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        Key: {key.search_key}
+                      </p>
+                    )}
 
                     {/* Category */}
                     <p
