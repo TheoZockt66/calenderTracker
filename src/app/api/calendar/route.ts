@@ -16,10 +16,12 @@ export async function GET(req: NextRequest) {
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
   try {
-    // Fetch events from the last 30 days and next 30 days
+    // Fetch events from 2026-01-01 to 1 month in the future
     const now = new Date();
-    const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const timeMin = new Date("2026-01-01T00:00:00Z").toISOString();
+    const futureDate = new Date(now);
+    futureDate.setMonth(futureDate.getMonth() + 1);
+    const timeMax = futureDate.toISOString();
 
     // Get list of calendars
     const calendarList = await calendar.calendarList.list();

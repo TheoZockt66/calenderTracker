@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
-import type { Category, TrackingKey } from "@/lib/types";
+import type { Category, TrackingKey, TrackedEvent } from "@/lib/types";
 import { DataTableFilter } from "@/components/ui/data-table-filter";
 import type { FilterOption } from "@/components/ui/data-table-filter";
 import {
@@ -14,6 +14,10 @@ import {
   Key,
   Trash2,
   Save,
+  Clock,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 /* ───── 30 distinct colors palette ───── */
@@ -54,6 +58,9 @@ export default function EditKeyPage() {
   const [category, setCategory] = useState("");
   const [calendar, setCalendar] = useState("");
   const [color, setColor] = useState("#000000");
+  const [events, setEvents] = useState<TrackedEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsExpanded, setEventsExpanded] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -92,6 +99,13 @@ export default function EditKeyPage() {
         })
         .catch(() => {})
         .finally(() => setLoading(false));
+
+      // Load tracked events for this key
+      fetch(`/api/events?key_id=${keyId}`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setEvents(data || []))
+        .catch(() => setEvents([]))
+        .finally(() => setEventsLoading(false));
     }
   }, [session, keyId]);
 
@@ -359,6 +373,103 @@ export default function EditKeyPage() {
               {Math.round(keyData.total_minutes / 60 * 10) / 10}h getrackt
             </div>
           </div>
+        </div>
+
+        {/* Tracked Events */}
+        <div
+          className="glow-card animate-fade-up delay-2"
+          style={{ padding: "20px", marginTop: "16px" }}
+        >
+          <button
+            onClick={() => setEventsExpanded(!eventsExpanded)}
+            className="w-full flex items-center justify-between"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit" }}
+          >
+            <p className="text-[12px] font-semibold text-[var(--app-text-muted)] uppercase tracking-wider">
+              Zugeordnete Events ({events.length})
+            </p>
+            {eventsExpanded ? (
+              <ChevronUp size={16} style={{ color: "var(--app-text-muted)" }} />
+            ) : (
+              <ChevronDown size={16} style={{ color: "var(--app-text-muted)" }} />
+            )}
+          </button>
+
+          {eventsExpanded && (
+            <div className="mt-4">
+              {eventsLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 size={18} className="animate-spin" style={{ color: "var(--app-text-muted)" }} />
+                </div>
+              ) : events.length === 0 ? (
+                <p style={{ fontSize: "13px", color: "var(--app-text-muted)", textAlign: "center", padding: "16px 0" }}>
+                  Noch keine Events zugeordnet. Starte einen Sync um Events zu finden.
+                </p>
+              ) : (
+                <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                  {events.map((event, i) => {
+                    const startDate = new Date(event.start_time);
+                    const dateStr = startDate.toLocaleDateString("de-DE", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    });
+                    const timeStr = startDate.toLocaleTimeString("de-DE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                    const hours = Math.floor(event.duration_minutes / 60);
+                    const mins = event.duration_minutes % 60;
+                    const durationStr = hours > 0
+                      ? mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+                      : `${mins}m`;
+
+                    return (
+                      <div
+                        key={event.id}
+                        style={{
+                          padding: "12px 0",
+                          borderBottom: i < events.length - 1 ? "1px solid var(--app-border)" : "none",
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p style={{ fontSize: "14px", fontWeight: 600 }} className="truncate">
+                              {event.summary}
+                            </p>
+                            <div
+                              className="flex items-center gap-3 mt-1"
+                              style={{ fontSize: "12px", color: "var(--app-text-muted)" }}
+                            >
+                              <span className="flex items-center gap-1">
+                                <CalendarDays size={11} />
+                                {dateStr}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock size={11} />
+                                {timeStr}
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            className="chip text-[11px] shrink-0"
+                            style={{
+                              background: `${color}15`,
+                              color: color,
+                              border: `1px solid ${color}25`,
+                            }}
+                          >
+                            {durationStr}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}

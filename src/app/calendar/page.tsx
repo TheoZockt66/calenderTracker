@@ -10,6 +10,7 @@ import type { FilterOption } from "@/components/ui/data-table-filter";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DatePickerInput } from "@mantine/dates";
 import "dayjs/locale/de";
+import type { TrackingKey } from "@/lib/types";
 import {
   ArrowLeft,
   CalendarDays,
@@ -22,6 +23,7 @@ import {
   Circle,
   ListTodo,
   RefreshCw,
+  Key,
 } from "lucide-react";
 
 /* ───── Types ───── */
@@ -80,13 +82,6 @@ interface TasksData {
 /* ───── Helpers ───── */
 type DayFilter = "today" | "7days" | "30days" | "all" | "custom";
 type ViewTab = "events" | "tasks";
-
-const DAY_FILTER_LABELS: Record<Exclude<DayFilter, "custom">, string> = {
-  today: "Heute",
-  "7days": "7 Tage",
-  "30days": "30 Tage",
-  all: "Alle",
-};
 
 /* ───── Filter Options ───── */
 const dayFilterOptions: FilterOption[] = [
@@ -197,7 +192,7 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
               </p>
             </div>
 
-            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
               {today && <span className="chip chip-success" style={{ fontSize: "10px" }}>Heute</span>}
               {duration && !event.allDay && (
                 <span className="chip" style={{ fontSize: "11px" }}>
@@ -218,7 +213,7 @@ function EventCard({ event, index }: { event: CalendarEvent; index: number }) {
               {event.calendarName}
             </span>
             {event.location && (
-              <span className="flex items-center gap-1 truncate max-w-[200px]">
+              <span className="flex items-center gap-1 truncate max-w-50">
                 <MapPin size={11} />
                 {event.location}
               </span>
@@ -245,9 +240,9 @@ function TaskCard({ task, index }: { task: TaskItem; index: number }) {
       <div className={`card p-4 relative ${done ? "opacity-60" : ""}`}>
         <div className="flex items-start gap-3">
           {done ? (
-            <CheckCircle2 size={18} className="flex-shrink-0 mt-0.5" style={{ color: "var(--app-success)" }} />
+            <CheckCircle2 size={18} className="shrink-0 mt-0.5" style={{ color: "var(--app-success)" }} />
           ) : (
-            <Circle size={18} className="flex-shrink-0 mt-0.5" style={{ color: "var(--app-text-muted)" }} />
+            <Circle size={18} className="shrink-0 mt-0.5" style={{ color: "var(--app-text-muted)" }} />
           )}
           <div className="min-w-0 flex-1">
             <p
@@ -307,6 +302,7 @@ export default function CalendarPage() {
   // Data
   const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
   const [tasksData, setTasksData] = useState<TasksData | null>(null);
+  const [trackingKeys, setTrackingKeys] = useState<TrackingKey[]>([]);
   const [loadingCal, setLoadingCal] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -319,18 +315,18 @@ export default function CalendarPage() {
   const [customDate, setCustomDate] = useState<string>("");
   const [selectedCalendars, setSelectedCalendars] = useState<Set<string>>(new Set());
   const [taskFilter, setTaskFilter] = useState<"all" | "open" | "done">("open");
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
 
-  useEffect(() => {
-    if (session) {
-      loadCalendarData();
-      loadTasksData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  const loadTrackingKeys = () => {
+    fetch("/api/keys")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setTrackingKeys(data || []))
+      .catch(() => setTrackingKeys([]));
+  };
 
   const loadCalendarData = () => {
     setLoadingCal(true);
@@ -365,6 +361,14 @@ export default function CalendarPage() {
       .finally(() => setLoadingTasks(false));
   };
 
+  useEffect(() => {
+    if (session) {
+      loadCalendarData();
+      loadTasksData();
+      loadTrackingKeys();
+    }
+  }, [session]);
+
   // Auto-refresh every 10 minutes
   useEffect(() => {
     if (!session) return;
@@ -373,7 +377,6 @@ export default function CalendarPage() {
       loadTasksData();
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   const handleDayFilterChange = (filter: DayFilter) => {
@@ -391,19 +394,6 @@ export default function CalendarPage() {
     setDayFilter("30days");
   };
 
-  const toggleCalendar = (calId: string) => {
-    setSelectedCalendars((prev) => {
-      const next = new Set(prev);
-      next.has(calId) ? next.delete(calId) : next.add(calId);
-      return next;
-    });
-  };
-
-  const selectAllCalendars = () => {
-    if (calendarData) setSelectedCalendars(new Set(calendarData.calendars.map((c) => c.id)));
-  };
-  const deselectAllCalendars = () => setSelectedCalendars(new Set());
-
   // Calendar filter options for DataTableFilter
   const calendarFilterOptions: FilterOption[] = useMemo(() => {
     if (!calendarData) return [];
@@ -413,19 +403,44 @@ export default function CalendarPage() {
     }));
   }, [calendarData]);
 
+  // Key filter options
+  const keyFilterOptions: FilterOption[] = useMemo(() => {
+    return trackingKeys.map((k) => ({
+      value: k.id,
+      label: k.name,
+      icon: Key,
+    }));
+  }, [trackingKeys]);
+
   // Filtered events
   const filteredEvents = useMemo(() => {
     if (!calendarData) return [];
     return calendarData.events.filter((event) => {
+      // Calendar filter
       const cal = calendarData.calendars.find((c) => c.name === event.calendarName);
       if (cal && !selectedCalendars.has(cal.id)) return false;
-      if (dayFilter === "today") return isToday(event.start);
-      if (dayFilter === "7days") return isWithinDays(event.start, 7);
-      if (dayFilter === "30days") return isWithinDays(event.start, 30);
-      if (dayFilter === "custom" && customDate) return isSameDay(event.start, customDate);
+
+      // Time filter
+      if (dayFilter === "today" && !isToday(event.start)) return false;
+      if (dayFilter === "7days" && !isWithinDays(event.start, 7)) return false;
+      if (dayFilter === "30days" && !isWithinDays(event.start, 30)) return false;
+      if (dayFilter === "custom" && customDate && !isSameDay(event.start, customDate)) return false;
+
+      // Key filter
+      if (selectedKeys.length > 0) {
+        const summaryLower = (event.summary || "").toLowerCase();
+        const matchesAnyKey = selectedKeys.some((keyId) => {
+          const key = trackingKeys.find((k) => k.id === keyId);
+          if (!key) return false;
+          const searchTerm = (key.search_key || key.name).trim().toLowerCase();
+          return searchTerm !== "" && summaryLower.includes(searchTerm);
+        });
+        if (!matchesAnyKey) return false;
+      }
+
       return true;
     });
-  }, [calendarData, dayFilter, customDate, selectedCalendars]);
+  }, [calendarData, dayFilter, customDate, selectedCalendars, selectedKeys, trackingKeys]);
 
   // Filtered tasks
   const filteredTasks = useMemo(() => {
@@ -436,9 +451,6 @@ export default function CalendarPage() {
       return true;
     });
   }, [tasksData, taskFilter]);
-
-  const allSelected =
-    calendarData != null && selectedCalendars.size === calendarData.calendars.length;
 
   const loading = viewTab === "events" ? loadingCal : loadingTasks;
 
@@ -557,6 +569,15 @@ export default function CalendarPage() {
                 onChange={(vals) => setSelectedCalendars(new Set(vals))}
                 isMultiSelect
               />
+              {keyFilterOptions.length > 0 && (
+                <DataTableFilter
+                  label="Keys"
+                  options={keyFilterOptions}
+                  selectedValues={selectedKeys}
+                  onChange={(vals) => setSelectedKeys(vals)}
+                  isMultiSelect
+                />
+              )}
 
               {/* Date picker inline */}
               <DatePickerInput

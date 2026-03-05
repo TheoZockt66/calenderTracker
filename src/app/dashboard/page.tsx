@@ -90,6 +90,7 @@ export default function DashboardPage() {
   const [syncResult, setSyncResult] = useState<{
     newEvents: number;
     matched: number;
+    removedEvents?: number;
     totalCalendarEvents?: number;
     skippedDuplicates?: number;
     matchedSamples?: string[];
@@ -136,6 +137,7 @@ export default function DashboardPage() {
         setSyncResult({
           newEvents: result.newEvents || 0,
           matched: result.matched || 0,
+          removedEvents: result.removedEvents || 0,
           totalCalendarEvents: result.totalCalendarEvents || 0,
           skippedDuplicates: result.skippedDuplicates || 0,
           matchedSamples: result.matchedSamples || [],
@@ -299,12 +301,12 @@ export default function DashboardPage() {
             style={{
               background: syncResult.error
                 ? "rgba(255, 59, 48, 0.12)"
-                : syncResult.newEvents > 0
+                : syncResult.newEvents > 0 || (syncResult.removedEvents ?? 0) > 0
                   ? "rgba(52, 199, 89, 0.12)"
                   : "var(--app-accent-soft)",
               border: syncResult.error
                 ? "1px solid rgba(255, 59, 48, 0.25)"
-                : syncResult.newEvents > 0
+                : syncResult.newEvents > 0 || (syncResult.removedEvents ?? 0) > 0
                   ? "1px solid rgba(52, 199, 89, 0.25)"
                   : "1px solid var(--app-border)",
             }}
@@ -315,7 +317,7 @@ export default function DashboardPage() {
                 style={{
                   color: syncResult.error
                     ? "#FF3B30"
-                    : syncResult.newEvents > 0
+                    : syncResult.newEvents > 0 || (syncResult.removedEvents ?? 0) > 0
                       ? "#34C759"
                       : "var(--app-text-muted)",
                 }}
@@ -323,8 +325,8 @@ export default function DashboardPage() {
               <p style={{ fontSize: "13px", fontWeight: 500, flex: 1 }}>
                 {syncResult.error
                   ? `Fehler: ${syncResult.error}`
-                  : syncResult.newEvents > 0
-                    ? `${syncResult.newEvents} neue Events zugeordnet (${syncResult.matched} Treffer, ${syncResult.totalCalendarEvents} Kalender-Events gescannt)`
+                  : syncResult.newEvents > 0 || (syncResult.removedEvents ?? 0) > 0
+                    ? `${syncResult.newEvents} neue Events zugeordnet${(syncResult.removedEvents ?? 0) > 0 ? `, ${syncResult.removedEvents} gelöschte entfernt` : ""} (${syncResult.totalCalendarEvents} Kalender-Events gescannt)`
                     : `Keine neuen Events. ${syncResult.totalCalendarEvents || 0} Kalender-Events gescannt, ${syncResult.matched || 0} Treffer (${syncResult.skippedDuplicates || 0} Duplikate).`}
               </p>
               <div className="flex items-center gap-2">

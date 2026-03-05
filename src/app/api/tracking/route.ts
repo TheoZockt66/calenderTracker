@@ -54,20 +54,18 @@ export async function POST(req: NextRequest) {
 
     const existingSet = new Set(
       (existingEvents || []).map(
-        (e) => `${e.key_id}|${e.summary}|${e.start_time}`
+        (e) => `${e.key_id}|${e.summary}|${new Date(e.start_time).getTime()}`
       )
     );
 
     debugLog.push(`${existingSet.size} bereits getrackte Events in DB.`);
 
-    // 3. Fetch calendar events (last 90 days + next 30 days)
+    // 3. Fetch calendar events (from 2026-01-01 to 1 month in the future)
     const now = new Date();
-    const timeMin = new Date(
-      now.getTime() - 90 * 24 * 60 * 60 * 1000
-    ).toISOString();
-    const timeMax = new Date(
-      now.getTime() + 30 * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const timeMin = new Date("2026-01-01T00:00:00Z").toISOString();
+    const futureDate = new Date(now);
+    futureDate.setMonth(futureDate.getMonth() + 1);
+    const timeMax = futureDate.toISOString();
 
     let calendarList;
     try {
@@ -169,8 +167,8 @@ export async function POST(req: NextRequest) {
         if (matches && calendarMatch) {
           totalMatched++;
 
-          // Check for duplicate
-          const dedupeKey = `${key.id}|${event.summary}|${event.start}`;
+          // Check for duplicate (normalize timestamp to UTC millis for consistent comparison)
+          const dedupeKey = `${key.id}|${event.summary}|${startDate.getTime()}`;
           if (existingSet.has(dedupeKey)) {
             skippedDuplicates++;
             continue;
@@ -215,30 +213,79 @@ export async function POST(req: NextRequest) {
 
     debugLog.push(`Matching: ${totalMatched} Treffer, ${newEventsCount} neu, ${skippedDuplicates} Duplikate übersprungen, ${skippedAllDay} ganztägige übersprungen.`);
 
-    // 5. Batch update key statistics
-    for (const [keyId, updates] of keyUpdates) {
-      // Use RPC to increment: first call adds all minutes + 1 event
-      for (let i = 0; i < updates.addEvents; i++) {
-        const { error: rpcError } = await supabase.rpc("increment_key_stats", {
-          p_key_id: keyId,
-          p_minutes: i === 0 ? updates.addMinutes : 0,
-        });
-        if (rpcError) {
-          debugLog.push(`⚠ Stats-Update Fehler für Key ${keyId}: ${rpcError.message}`);
-          break;
+    // 5. Cleanup: Remove tracked events whose calendar events no longer exist
+    // Build a set of all calendar event signatures (summary + start timestamp)
+    const calendarEventSignatures = new Set(
+      allEvents
+        .filter((e) => e.start && !e.allDay)
+        .map((e) => `${e.summary}|${new Date(e.start!).getTime()}`)
+    );
+
+    let removedCount = 0;
+    let removedMinutes = 0;
+    const removedFromKeys = new Map<string, { minutes: number; count: number }>();
+
+    if (existingEvents && existingEvents.length > 0) {
+      for (const tracked of existingEvents) {
+        const sig = `${tracked.summary}|${new Date(tracked.start_time).getTime()}`;
+        if (!calendarEventSignatures.has(sig)) {
+          // This tracked event no longer exists in Google Calendar — remove it
+          const { data: deleted } = await supabase
+            .from("tracked_events")
+            .delete()
+            .eq("id", tracked.id)
+            .select("duration_minutes, key_id")
+            .single();
+
+          if (deleted) {
+            removedCount++;
+            removedMinutes += deleted.duration_minutes || 0;
+            const prev = removedFromKeys.get(deleted.key_id) || { minutes: 0, count: 0 };
+            prev.minutes += deleted.duration_minutes || 0;
+            prev.count += 1;
+            removedFromKeys.set(deleted.key_id, prev);
+          }
         }
       }
     }
 
-    debugLog.push(`${keyUpdates.size} Keys aktualisiert.`);
+    if (removedCount > 0) {
+      debugLog.push(`🗑 ${removedCount} gelöschte Events entfernt (${removedMinutes}min).`);
+    }
+
+    // 6. Recalculate stats for all affected keys (instead of incremental updates)
+    // Collect all key IDs that were either updated or had events removed
+    const affectedKeyIds = new Set([
+      ...keyUpdates.keys(),
+      ...removedFromKeys.keys(),
+    ]);
+
+    // For all affected keys, recalculate from tracked_events
+    for (const keyId of affectedKeyIds) {
+      const { data: keyEvents } = await supabase
+        .from("tracked_events")
+        .select("duration_minutes")
+        .eq("key_id", keyId);
+
+      const totalMin = (keyEvents || []).reduce((s, e) => s + (e.duration_minutes || 0), 0);
+      const totalCnt = (keyEvents || []).length;
+
+      await supabase
+        .from("tracking_keys")
+        .update({ total_minutes: totalMin, event_count: totalCnt })
+        .eq("id", keyId);
+    }
+
+    debugLog.push(`${affectedKeyIds.size} Keys Stats neu berechnet.`);
 
     return NextResponse.json({
       message: "Tracking sync complete",
       totalCalendarEvents: allEvents.length,
       matched: totalMatched,
       newEvents: newEventsCount,
+      removedEvents: removedCount,
       skippedDuplicates,
-      keysUpdated: keyUpdates.size,
+      keysUpdated: affectedKeyIds.size,
       matchedSamples,
       debug: debugLog,
     });
