@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { formatMinutes } from "@/lib/mock-data";
-import type { Category, TrackingKey } from "@/lib/types";
+import type { Category, TrackingKey, TrackedEvent } from "@/lib/types";
 import { GlowCard } from "@/components/GlowCard";
 import {
   ArrowLeft,
@@ -20,6 +20,8 @@ import {
   TrendingUp,
   Zap,
   CheckCircle2,
+  CalendarClock,
+  CalendarDays,
 } from "lucide-react";
 
 function StatTile({
@@ -83,8 +85,14 @@ export default function DashboardPage() {
   const router = useRouter();
   const { t } = useI18n();
 
+  type ViewMode = "total" | "today" | "excludePlanned";
+  const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [categories, setCategories] = useState<Category[]>([]);
   const [keys, setKeys] = useState<TrackingKey[]>([]);
+  const [trackedEvents, setTrackedEvents] = useState<TrackedEvent[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<
+    { summary: string; start: string | null; end: string | null }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{
@@ -109,14 +117,20 @@ export default function DashboardPage() {
     Promise.all([
       fetch("/api/categories").then((r) => (r.ok ? r.json() : [])),
       fetch("/api/keys").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/events").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/calendar").then((r) => (r.ok ? r.json() : { events: [] })),
     ])
-      .then(([catData, keysData]) => {
+      .then(([catData, keysData, eventsData, calData]) => {
         setCategories(catData || []);
         setKeys(keysData || []);
+        setTrackedEvents(eventsData || []);
+        setCalendarEvents(calData?.events || []);
       })
       .catch(() => {
         setCategories([]);
         setKeys([]);
+        setTrackedEvents([]);
+        setCalendarEvents([]);
       })
       .finally(() => setLoading(false));
   };
@@ -197,18 +211,103 @@ export default function DashboardPage() {
     return Array.from(map.values()).filter((b) => b.keys.length > 0);
   }, [categories, keys]);
 
-  // Compute totals
-  const totalHours = useMemo(
-    () =>
-      Math.round(
-        (keys.reduce((s, k) => s + k.total_minutes, 0) / 60) * 10
-      ) / 10,
-    [keys]
-  );
-  const totalEvents = useMemo(
-    () => keys.reduce((s, k) => s + k.event_count, 0),
-    [keys]
-  );
+  // Compute per-key stats based on view mode
+  const filteredKeyStats = useMemo(() => {
+    const perKey = new Map<string, { minutes: number; events: number }>();
+    const today = new Date().toISOString().split("T")[0];
+
+    if (viewMode === "excludePlanned") {
+      // Only tracked events up to and including today
+      for (const e of trackedEvents) {
+        if (e.event_date <= today) {
+          const existing = perKey.get(e.key_id) || {
+            minutes: 0,
+            events: 0,
+          };
+          existing.minutes += e.duration_minutes;
+          existing.events += 1;
+          perKey.set(e.key_id, existing);
+        }
+      }
+    } else if (viewMode === "today") {
+      // Only tracked events from today
+      for (const e of trackedEvents) {
+        if (e.event_date === today) {
+          const existing = perKey.get(e.key_id) || {
+            minutes: 0,
+            events: 0,
+          };
+          existing.minutes += e.duration_minutes;
+          existing.events += 1;
+          perKey.set(e.key_id, existing);
+        }
+      }
+    } else {
+      // "total": all tracked events + future calendar events matched to keys
+      for (const e of trackedEvents) {
+        const existing = perKey.get(e.key_id) || { minutes: 0, events: 0 };
+        existing.minutes += e.duration_minutes;
+        existing.events += 1;
+        perKey.set(e.key_id, existing);
+      }
+
+      // Match future calendar events to keys
+      const now = new Date();
+      for (const calEvt of calendarEvents) {
+        if (!calEvt.start || !calEvt.end) continue;
+        const evtStart = new Date(calEvt.start);
+        if (evtStart <= now) continue; // only future
+
+        for (const key of keys) {
+          if (!key.search_key) continue;
+          if (
+            calEvt.summary
+              .toLowerCase()
+              .includes(key.search_key.toLowerCase())
+          ) {
+            // Check if already tracked
+            const alreadyTracked = trackedEvents.some(
+              (te) =>
+                te.key_id === key.id &&
+                new Date(te.start_time).getTime() === evtStart.getTime()
+            );
+            if (!alreadyTracked) {
+              const existing = perKey.get(key.id) || {
+                minutes: 0,
+                events: 0,
+              };
+              const durationMin = Math.round(
+                (new Date(calEvt.end).getTime() - evtStart.getTime()) / 60000
+              );
+              existing.minutes += durationMin;
+              existing.events += 1;
+              perKey.set(key.id, existing);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    return perKey;
+  }, [viewMode, keys, trackedEvents, calendarEvents]);
+
+  // Compute totals from filtered stats
+  const totalHours = useMemo(() => {
+    let totalMin = 0;
+    for (const { minutes } of filteredKeyStats.values()) {
+      totalMin += minutes;
+    }
+    return Math.round((totalMin / 60) * 10) / 10;
+  }, [filteredKeyStats]);
+
+  const totalEvents = useMemo(() => {
+    let total = 0;
+    for (const { events } of filteredKeyStats.values()) {
+      total += events;
+    }
+    return total;
+  }, [filteredKeyStats]);
 
   if (status === "loading" || loading) {
     return (
@@ -376,6 +475,60 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* View Mode Toggle */}
+        <div
+          className="animate-fade-up delay-1"
+          style={{
+            display: "flex",
+            gap: "6px",
+            marginBottom: "16px",
+            padding: "4px",
+            borderRadius: "14px",
+            background: "var(--app-accent-soft)",
+            width: "fit-content",
+          }}
+        >
+          {(
+            [
+              { key: "total", label: "Gesamt", icon: BarChart3 },
+              { key: "today", label: "Heute", icon: CalendarDays },
+              { key: "excludePlanned", label: "Exkl. Geplant", icon: CalendarClock },
+            ] as const
+          ).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setViewMode(key)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 16px",
+                borderRadius: "10px",
+                fontSize: "13px",
+                fontWeight: viewMode === key ? 700 : 500,
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                background:
+                  viewMode === key
+                    ? "var(--app-card-bg)"
+                    : "transparent",
+                color:
+                  viewMode === key
+                    ? "var(--app-text)"
+                    : "var(--app-text-muted)",
+                boxShadow:
+                  viewMode === key
+                    ? "0 1px 3px rgba(0,0,0,0.1)"
+                    : "none",
+              }}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* Stats Grid */}
         <div
           className="animate-fade-up delay-1"
@@ -390,13 +543,25 @@ export default function DashboardPage() {
             icon={Clock}
             label={t("dashboard.totalHours")}
             value={`${totalHours}h`}
-            sub="Alle Keys"
+            sub={
+              viewMode === "today"
+                ? "Heute"
+                : viewMode === "excludePlanned"
+                  ? "Nur getrackt"
+                  : "Getrackt + Geplant"
+            }
           />
           <StatTile
             icon={BarChart3}
             label={t("dashboard.totalEvents")}
             value={totalEvents}
-            sub="Getrackte Events"
+            sub={
+              viewMode === "today"
+                ? "Heute"
+                : viewMode === "excludePlanned"
+                  ? "Nur getrackte Events"
+                  : "Getrackt + Geplant"
+            }
           />
           <StatTile
             icon={Key}
@@ -469,11 +634,15 @@ export default function DashboardPage() {
                 const catId = category?.id || "uncategorized";
                 const isExpanded = expandedCategory === catId;
                 const totalMin = catKeys.reduce(
-                  (s, k) => s + k.total_minutes,
+                  (s, k) =>
+                    s +
+                    (filteredKeyStats.get(k.id)?.minutes ?? k.total_minutes),
                   0
                 );
                 const totalEvts = catKeys.reduce(
-                  (s, k) => s + k.event_count,
+                  (s, k) =>
+                    s +
+                    (filteredKeyStats.get(k.id)?.events ?? k.event_count),
                   0
                 );
 
@@ -556,10 +725,16 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="text-[12px] text-[var(--app-text-muted)] tabular-nums">
-                                {formatMinutes(key.total_minutes)}
+                                {formatMinutes(
+                                  filteredKeyStats.get(key.id)?.minutes ??
+                                    key.total_minutes
+                                )}
                               </span>
                               <span className="text-[11px] text-[var(--app-text-muted)]">
-                                · {key.event_count} Events
+                                ·{" "}
+                                {filteredKeyStats.get(key.id)?.events ??
+                                  key.event_count}{" "}
+                                Events
                               </span>
                               <ChevronRight
                                 size={14}

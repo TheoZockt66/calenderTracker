@@ -24,7 +24,19 @@ export async function GET(req: NextRequest) {
     const timeMax = futureDate.toISOString();
 
     // Get list of calendars
-    const calendarList = await calendar.calendarList.list();
+    let calendarList;
+    try {
+      calendarList = await calendar.calendarList.list();
+    } catch (authErr: unknown) {
+      const code = (authErr as { code?: number }).code;
+      if (code === 401 || code === 403) {
+        return NextResponse.json(
+          { error: "Token expired", calendars: [], events: [], total: 0 },
+          { status: 401 }
+        );
+      }
+      throw authErr;
+    }
     const calendars = calendarList.data.items || [];
 
     // Fetch events from all calendars
