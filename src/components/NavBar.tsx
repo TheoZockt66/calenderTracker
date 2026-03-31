@@ -8,9 +8,9 @@ import { motion } from "framer-motion";
 import {
   Home,
   LayoutDashboard,
-  CalendarDays,
   Key,
   Settings,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,8 +23,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { name: "Home", url: "/", icon: Home },
   { name: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { name: "Kalender", url: "/calendar", icon: CalendarDays },
   { name: "Keys", url: "/keys", icon: Key },
+  { name: "Verlauf", url: "/key-visualization", icon: Activity },
   { name: "Settings", url: "/settings", icon: Settings },
 ];
 
