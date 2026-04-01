@@ -83,6 +83,8 @@ function KeyPicker({
     window.innerWidth - menuWidth - margin
   );
 
+  const arrowLeft = Math.min(Math.max(cx - left - 6, 12), menuWidth - 24);
+
   return (
     <>
       {/* Invisible backdrop to catch outside clicks */}
@@ -95,18 +97,20 @@ function KeyPicker({
       <div
         style={{
           position: "fixed",
-          bottom: "calc(72px + env(safe-area-inset-bottom))",
+          bottom: "calc(76px + env(safe-area-inset-bottom))",
           left: `${left}px`,
           zIndex: 50,
           width: `${menuWidth}px`,
+          animation: "fadeUp 0.15s ease",
+        }}
+      >
+        <div style={{
           background: "var(--app-surface)",
           border: "1px solid var(--app-border)",
           borderRadius: "12px",
           boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
           overflow: "hidden",
-          animation: "fadeUp 0.15s ease",
-        }}
-      >
+        }}>
         {keys.map((k, i) => {
           const isActive = i === currentIdx;
           const kColor = k.color || "#7C7CFF";
@@ -152,6 +156,29 @@ function KeyPicker({
             </button>
           );
         })}
+        </div>
+
+        {/* Caret pointing down toward the NavBar button */}
+        <div style={{
+          position: "absolute",
+          bottom: "-6px",
+          left: `${arrowLeft}px`,
+          width: "12px",
+          height: "6px",
+          overflow: "hidden",
+        }}>
+          <div style={{
+            position: "absolute",
+            top: "-6px",
+            left: "0",
+            width: "12px",
+            height: "12px",
+            background: "var(--app-surface)",
+            border: "1px solid var(--app-border)",
+            transform: "rotate(45deg)",
+            transformOrigin: "center",
+          }} />
+        </div>
       </div>
 
       <style>{`
