@@ -1,29 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
+import { getUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  // Get session with access token
-  const { getToken } = await import("next-auth/jwt");
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
-  if (!token?.accessToken) {
+  const user = await getUser(req);
+  if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: token.accessToken as string });
+  oauth2Client.setCredentials({ access_token: user.accessToken });
 
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
   try {
-    // Fetch events from 2026-01-01 to 1 month in the future
     const now = new Date();
     const timeMin = new Date("2026-01-01T00:00:00Z").toISOString();
     const futureDate = new Date(now);
     futureDate.setMonth(futureDate.getMonth() + 1);
     const timeMax = futureDate.toISOString();
 
-    // Get list of calendars
     let calendarList;
     try {
       calendarList = await calendar.calendarList.list();
@@ -39,7 +35,6 @@ export async function GET(req: NextRequest) {
     }
     const calendars = calendarList.data.items || [];
 
-    // Fetch events from all calendars
     interface CalendarEventItem {
       id: string | null | undefined;
       summary: string;
@@ -94,7 +89,6 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Sort by start time
     allEvents.sort((a, b) => {
       const dateA = new Date(a.start || "1970-01-01").getTime();
       const dateB = new Date(b.start || "1970-01-01").getTime();

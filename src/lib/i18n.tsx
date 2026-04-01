@@ -57,6 +57,7 @@ const translations: Record<Locale, Translations> = {
     "keys.created": "Erstellt",
     "keys.searchKey": "Tracking-Key",
     "keys.searchKeyHint": "Dieser Begriff wird im Kalendertitel gesucht (z.B. \"GPM\" für Geschäftsprozessmanagement).",
+    "keys.searchKeyHintMulti": "Mehrere Suchbegriffe mit Komma trennen. Ein Event matcht, wenn mindestens ein Begriff im Titel enthalten ist.",
     "keys.nameHint": "Anzeigename für das Dashboard und die Übersicht.",
     "keys.newKey": "Neuen Key erstellen",
     "keys.newKeyDesc": "Definiere einen neuen Tracking-Key",
@@ -124,6 +125,26 @@ const translations: Record<Locale, Translations> = {
     "tracking.matched": "zugeordnet",
     "tracking.newEvents": "Neue Events",
 
+    // Analytics
+    "analytics.title": "Analytics",
+    "analytics.subtitle": "Wochen- und Monatsvergleich deiner getrackten Zeiten",
+    "analytics.currentStreak": "Tage-Streak",
+    "analytics.longestStreak": "Längster Streak",
+    "analytics.days": "Tage",
+    "analytics.activeDays": "Aktive Tage",
+    "analytics.weeklyBudget": "Wochenbudget",
+    "analytics.weeklyChart": "Wochenverlauf",
+    "analytics.perKey": "Pro Key",
+
+    // Timeline
+    "timeline.title": "Timeline",
+    "timeline.subtitle": "Tagesansicht deiner getrackten Zeiten",
+
+    // Export
+    "export.title": "Export",
+    "export.subtitle": "Stundenzettel als CSV oder PDF exportieren",
+    "export.dateRange": "Zeitraum",
+
     // Common
     "common.save": "Speichern",
     "common.cancel": "Abbrechen",
@@ -185,6 +206,7 @@ const translations: Record<Locale, Translations> = {
     "keys.created": "Created",
     "keys.searchKey": "Tracking Key",
     "keys.searchKeyHint": "This term is searched in calendar event titles (e.g. \"GPM\" for Business Process Management).",
+    "keys.searchKeyHintMulti": "Separate multiple search terms with commas. An event matches if at least one term is found in the title.",
     "keys.nameHint": "Display name for the dashboard and overview.",
     "keys.newKey": "Create New Key",
     "keys.newKeyDesc": "Define a new tracking key",
@@ -251,6 +273,26 @@ const translations: Record<Locale, Translations> = {
     "tracking.lastSync": "Last Sync",
     "tracking.matched": "matched",
     "tracking.newEvents": "New Events",
+
+    // Analytics
+    "analytics.title": "Analytics",
+    "analytics.subtitle": "Weekly and monthly comparison of your tracked time",
+    "analytics.currentStreak": "Day Streak",
+    "analytics.longestStreak": "Longest Streak",
+    "analytics.days": "days",
+    "analytics.activeDays": "Active Days",
+    "analytics.weeklyBudget": "Weekly Budget",
+    "analytics.weeklyChart": "Weekly Trend",
+    "analytics.perKey": "Per Key",
+
+    // Timeline
+    "timeline.title": "Timeline",
+    "timeline.subtitle": "Daily view of your tracked time",
+
+    // Export
+    "export.title": "Export",
+    "export.subtitle": "Export timesheets as CSV or PDF",
+    "export.dateRange": "Date Range",
 
     // Common
     "common.save": "Save",

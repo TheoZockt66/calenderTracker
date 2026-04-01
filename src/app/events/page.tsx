@@ -10,7 +10,8 @@ import type { TrackedEvent, TrackingKey } from "@/lib/types";
 import { GlowingEffect } from "@/components/GlowingEffect";
 import { EmptyState } from "@/components/EmptyState";
 import { Switch } from "@/components/ui/Switch";
-import { Search, Clock, Filter, CalendarDays, ArrowLeft, Loader2 } from "lucide-react";
+import { Search, Clock, CalendarDays, ArrowLeft, Loader2 } from "lucide-react";
+import { AnimatedSelect } from "@/components/ui/animated-select";
 
 function formatDate(dateStr: string, locale: string): string {
   return new Date(dateStr).toLocaleDateString(
@@ -157,26 +158,14 @@ export default function EventsPage() {
                 className="input input-icon"
               />
             </div>
-            <div className="relative">
-              <Filter
-                size={14}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2"
-                style={{ color: "var(--app-text-muted)" }}
-              />
-              <select
-                value={selectedKey}
-                onChange={(e) => setSelectedKey(e.target.value)}
-                className="input input-icon appearance-none pr-10 cursor-pointer"
-                style={{ width: "auto", minWidth: "150px" }}
-              >
-                <option value="all">{t("events.allKeys")}</option>
-                {keys.map((key) => (
-                  <option key={key.id} value={key.id}>
-                    {key.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <AnimatedSelect
+              value={selectedKey}
+              onChange={(v) => setSelectedKey(v)}
+              options={[
+                { value: "all", label: t("events.allKeys") },
+                ...keys.map((key) => ({ value: key.id, label: key.name })),
+              ]}
+            />
           </div>
 
           {/* GPM Filter Toggle */}

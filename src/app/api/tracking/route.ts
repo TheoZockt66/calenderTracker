@@ -1,36 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { supabase } from "@/lib/supabase";
+import { getUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 /**
+ * Check if an event summary matches a search_key string.
+ * search_key can contain multiple comma-separated terms.
+ * Returns true if any term matches (case-insensitive).
+ */
+function matchesSearchKey(summary: string, searchKey: string): boolean {
+  const summaryLower = summary.toLowerCase();
+  const terms = searchKey.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+  return terms.some((term) => summaryLower.includes(term));
+}
+
+/**
  * POST /api/tracking
  * Scans Google Calendar events and matches them against tracking keys.
- * For each key: if the event summary contains the search_key (case-insensitive),
- * the event is tracked. Also checks for duplicates before inserting.
+ * Supports incremental sync via Google syncToken per calendar.
+ * Supports multiple search terms per key (comma-separated).
  */
 export async function POST(req: NextRequest) {
-  // Authenticate
-  const { getToken } = await import("next-auth/jwt");
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
-  if (!token?.accessToken) {
+  const user = await getUser(req);
+  if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: token.accessToken as string });
+  oauth2Client.setCredentials({ access_token: user.accessToken });
 
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
   const debugLog: string[] = [];
 
   try {
-    // 1. Get all tracking keys from Supabase
+    // 1. Get all tracking keys for this user from Supabase
     const { data: keys, error: keysError } = await supabase
       .from("tracking_keys")
-      .select("*");
+      .select("*")
+      .eq("user_id", user.id);
 
     if (keysError) {
       return NextResponse.json({ error: keysError.message }, { status: 500 });
@@ -50,7 +60,8 @@ export async function POST(req: NextRequest) {
     // 2. Get existing tracked event IDs to prevent duplicates
     const { data: existingEvents } = await supabase
       .from("tracked_events")
-      .select("id, summary, start_time, key_id");
+      .select("id, summary, start_time, key_id")
+      .eq("user_id", user.id);
 
     const existingSet = new Set(
       (existingEvents || []).map(
@@ -60,7 +71,18 @@ export async function POST(req: NextRequest) {
 
     debugLog.push(`${existingSet.size} bereits getrackte Events in DB.`);
 
-    // 3. Fetch calendar events (from 2026-01-01 to 1 month in the future)
+    // 3. Get stored sync tokens for incremental sync
+    const { data: storedTokens } = await supabase
+      .from("sync_tokens")
+      .select("calendar_id, sync_token")
+      .eq("user_id", user.id);
+
+    const syncTokenMap = new Map<string, string>();
+    for (const st of storedTokens || []) {
+      syncTokenMap.set(st.calendar_id, st.sync_token);
+    }
+
+    // 4. Fetch calendar events (incremental or full)
     const now = new Date();
     const timeMin = new Date("2026-01-01T00:00:00Z").toISOString();
     const futureDate = new Date(now);
@@ -90,20 +112,64 @@ export async function POST(req: NextRequest) {
       allDay: boolean;
       calendarId: string;
       calendarName: string;
+      cancelled: boolean;
     }
 
     const allEvents: RawEvent[] = [];
+    let usedIncremental = false;
 
     for (const cal of calendars) {
+      const calId = cal.id!;
+      const existingSyncToken = syncTokenMap.get(calId);
+
       try {
-        const eventsRes = await calendar.events.list({
-          calendarId: cal.id!,
-          timeMin,
-          timeMax,
-          singleEvents: true,
-          orderBy: "startTime",
-          maxResults: 2500,
-        });
+        let eventsRes;
+        let isIncremental = false;
+
+        // Try incremental sync with stored syncToken
+        if (existingSyncToken) {
+          try {
+            eventsRes = await calendar.events.list({
+              calendarId: calId,
+              syncToken: existingSyncToken,
+              maxResults: 2500,
+            });
+            isIncremental = true;
+            usedIncremental = true;
+            debugLog.push(`↻ Kalender "${cal.summary}": Inkrementeller Sync.`);
+          } catch (syncErr: any) {
+            // 410 Gone = syncToken invalid, do full sync
+            if (syncErr?.code === 410 || syncErr?.status === 410) {
+              debugLog.push(`↻ Kalender "${cal.summary}": SyncToken abgelaufen, voller Sync.`);
+              eventsRes = null;
+            } else {
+              throw syncErr;
+            }
+          }
+        }
+
+        // Full sync (no token or token expired)
+        if (!eventsRes) {
+          eventsRes = await calendar.events.list({
+            calendarId: calId,
+            timeMin,
+            timeMax,
+            singleEvents: true,
+            orderBy: "startTime",
+            maxResults: 2500,
+          });
+        }
+
+        // Store new syncToken
+        const newSyncToken = eventsRes.data.nextSyncToken;
+        if (newSyncToken) {
+          await supabase
+            .from("sync_tokens")
+            .upsert(
+              { user_id: user.id, calendar_id: calId, sync_token: newSyncToken, updated_at: new Date().toISOString() },
+              { onConflict: "user_id,calendar_id" }
+            );
+        }
 
         const events = (eventsRes.data.items || []).map((event) => ({
           id: event.id || "",
@@ -111,8 +177,9 @@ export async function POST(req: NextRequest) {
           start: event.start?.dateTime || event.start?.date || null,
           end: event.end?.dateTime || event.end?.date || null,
           allDay: !event.start?.dateTime,
-          calendarId: cal.id || "",
+          calendarId: calId,
           calendarName: cal.summary || "Unbekannt",
+          cancelled: event.status === "cancelled",
         }));
 
         allEvents.push(...events);
@@ -121,21 +188,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    debugLog.push(`${allEvents.length} Kalender-Events abgerufen (${allEvents.filter(e => !e.allDay).length} mit Uhrzeit, ${allEvents.filter(e => e.allDay).length} ganztägig).`);
+    debugLog.push(`${allEvents.length} Kalender-Events abgerufen${usedIncremental ? " (inkrementell)" : ""}.`);
 
-    // 4. Match events against keys
+    // 5. Match events against keys (supports multiple comma-separated search terms)
     let totalMatched = 0;
     let newEventsCount = 0;
     let skippedDuplicates = 0;
     let skippedAllDay = 0;
-    const keyUpdates = new Map<
-      string,
-      { addMinutes: number; addEvents: number }
-    >();
+    const keyUpdates = new Map<string, { addMinutes: number; addEvents: number }>();
     const matchedSamples: string[] = [];
 
     for (const event of allEvents) {
-      if (!event.summary) continue;
+      if (!event.summary || event.cancelled) continue;
 
       // Skip all-day events
       if (event.allDay || !event.start || !event.end) {
@@ -143,7 +207,6 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const summaryLower = event.summary.toLowerCase();
       const startDate = new Date(event.start);
       const endDate = new Date(event.end);
       const durationMinutes = Math.round(
@@ -153,28 +216,23 @@ export async function POST(req: NextRequest) {
       if (durationMinutes <= 0) continue;
 
       for (const key of keys) {
-        // Match by search_key (case-insensitive), fallback to name
         const rawSearchKey = key.search_key || key.name || "";
         if (!rawSearchKey.trim()) continue;
-        
-        const searchTerm = rawSearchKey.trim().toLowerCase();
-        const matches = summaryLower.includes(searchTerm);
+
+        const matches = matchesSearchKey(event.summary, rawSearchKey);
 
         // Calendar filter: only if key has a specific calendar assigned
-        const calendarMatch =
-          !key.calendar_id || key.calendar_id === event.calendarId;
+        const calendarMatch = !key.calendar_id || key.calendar_id === event.calendarId;
 
         if (matches && calendarMatch) {
           totalMatched++;
 
-          // Check for duplicate (normalize timestamp to UTC millis for consistent comparison)
           const dedupeKey = `${key.id}|${event.summary}|${startDate.getTime()}`;
           if (existingSet.has(dedupeKey)) {
             skippedDuplicates++;
             continue;
           }
 
-          // Insert new tracked event
           const eventDate = event.start.split("T")[0];
           const { error: insertError } = await supabase
             .from("tracked_events")
@@ -186,6 +244,7 @@ export async function POST(req: NextRequest) {
               end_time: event.end,
               duration_minutes: durationMinutes,
               event_date: eventDate,
+              user_id: user.id,
             });
 
           if (!insertError) {
@@ -196,11 +255,7 @@ export async function POST(req: NextRequest) {
               matchedSamples.push(`"${event.summary}" → ${key.name} (${durationMinutes}min)`);
             }
 
-            // Accumulate key stat updates
-            const existing = keyUpdates.get(key.id) || {
-              addMinutes: 0,
-              addEvents: 0,
-            };
+            const existing = keyUpdates.get(key.id) || { addMinutes: 0, addEvents: 0 };
             existing.addMinutes += durationMinutes;
             existing.addEvents += 1;
             keyUpdates.set(key.id, existing);
@@ -213,11 +268,10 @@ export async function POST(req: NextRequest) {
 
     debugLog.push(`Matching: ${totalMatched} Treffer, ${newEventsCount} neu, ${skippedDuplicates} Duplikate übersprungen, ${skippedAllDay} ganztägige übersprungen.`);
 
-    // 5. Cleanup: Remove tracked events whose calendar events no longer exist
-    // Build a set of all calendar event signatures (summary + start timestamp)
+    // 6. Cleanup: Remove tracked events whose calendar events no longer exist
     const calendarEventSignatures = new Set(
       allEvents
-        .filter((e) => e.start && !e.allDay)
+        .filter((e) => e.start && !e.allDay && !e.cancelled)
         .map((e) => `${e.summary}|${new Date(e.start!).getTime()}`)
     );
 
@@ -225,11 +279,11 @@ export async function POST(req: NextRequest) {
     let removedMinutes = 0;
     const removedFromKeys = new Map<string, { minutes: number; count: number }>();
 
-    if (existingEvents && existingEvents.length > 0) {
+    // Only cleanup on full sync (not incremental, as incremental may not have all events)
+    if (!usedIncremental && existingEvents && existingEvents.length > 0) {
       for (const tracked of existingEvents) {
         const sig = `${tracked.summary}|${new Date(tracked.start_time).getTime()}`;
         if (!calendarEventSignatures.has(sig)) {
-          // This tracked event no longer exists in Google Calendar — remove it
           const { data: deleted } = await supabase
             .from("tracked_events")
             .delete()
@@ -253,14 +307,12 @@ export async function POST(req: NextRequest) {
       debugLog.push(`🗑 ${removedCount} gelöschte Events entfernt (${removedMinutes}min).`);
     }
 
-    // 6. Recalculate stats for all affected keys (instead of incremental updates)
-    // Collect all key IDs that were either updated or had events removed
+    // 7. Recalculate stats for all affected keys
     const affectedKeyIds = new Set([
       ...keyUpdates.keys(),
       ...removedFromKeys.keys(),
     ]);
 
-    // For all affected keys, recalculate from tracked_events
     for (const keyId of affectedKeyIds) {
       const { data: keyEvents } = await supabase
         .from("tracked_events")
@@ -278,6 +330,12 @@ export async function POST(req: NextRequest) {
 
     debugLog.push(`${affectedKeyIds.size} Keys Stats neu berechnet.`);
 
+    // 8. Update last_sync_at on user
+    await supabase
+      .from("users")
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq("id", user.id);
+
     return NextResponse.json({
       message: "Tracking sync complete",
       totalCalendarEvents: allEvents.length,
@@ -286,6 +344,7 @@ export async function POST(req: NextRequest) {
       removedEvents: removedCount,
       skippedDuplicates,
       keysUpdated: affectedKeyIds.size,
+      incremental: usedIncremental,
       matchedSamples,
       debug: debugLog,
     });
@@ -300,4 +359,22 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// GET /api/tracking - Get sync status for the current user
+export async function GET(req: NextRequest) {
+  const user = await getUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const { data } = await supabase
+    .from("users")
+    .select("last_sync_at")
+    .eq("id", user.id)
+    .single();
+
+  return NextResponse.json({
+    lastSyncAt: data?.last_sync_at || null,
+  });
 }

@@ -58,6 +58,7 @@ export default function EditKeyPage() {
   const [category, setCategory] = useState("");
   const [calendar, setCalendar] = useState("");
   const [color, setColor] = useState("#000000");
+  const [budgetHoursWeekly, setBudgetHoursWeekly] = useState<string>("");
   const [events, setEvents] = useState<TrackedEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsExpanded, setEventsExpanded] = useState(false);
@@ -95,6 +96,7 @@ export default function EditKeyPage() {
             setCategory(found.category_id || "");
             setCalendar(found.calendar_id || "");
             setColor(found.color);
+            setBudgetHoursWeekly(found.budget_hours_weekly != null ? String(found.budget_hours_weekly) : "");
           }
         })
         .catch(() => {})
@@ -137,6 +139,7 @@ export default function EditKeyPage() {
           color,
           category_id: category || null,
           calendar_id: calendar || null,
+          budget_hours_weekly: budgetHoursWeekly ? parseFloat(budgetHoursWeekly) : null,
         }),
       });
       if (!res.ok) throw new Error("Failed to update key");
@@ -276,13 +279,22 @@ export default function EditKeyPage() {
               <input
                 type="text"
                 className="input"
-                placeholder="z.B. GPM, Mathe …"
+                placeholder="z.B. GPM, Geschäftsprozess, Business Process"
                 value={searchKey}
                 onChange={(e) => setSearchKey(e.target.value)}
               />
               <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
-                {t("keys.searchKeyHint")}
+                {t("keys.searchKeyHintMulti")}
               </p>
+              {searchKey.includes(",") && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {searchKey.split(",").map((term, i) => term.trim() && (
+                    <span key={i} className="chip text-[10px]" style={{ background: `${color}15`, color, border: `1px solid ${color}25` }}>
+                      {term.trim()}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Category */}
@@ -318,6 +330,25 @@ export default function EditKeyPage() {
                   }
                 />
               )}
+            </div>
+
+            {/* Weekly Budget */}
+            <div>
+              <label className="block text-[12px] font-semibold text-[var(--app-text-muted)] mb-1.5 uppercase tracking-wider">
+                Wochenziel (Stunden)
+              </label>
+              <input
+                type="number"
+                className="input"
+                placeholder="z.B. 10"
+                value={budgetHoursWeekly}
+                onChange={(e) => setBudgetHoursWeekly(e.target.value)}
+                min="0"
+                step="0.5"
+              />
+              <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
+                Optional: Soll-Stunden pro Woche. Wird im Dashboard und Analytics als Fortschrittsbalken angezeigt.
+              </p>
             </div>
 
             {/* Color */}

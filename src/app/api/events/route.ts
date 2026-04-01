@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/events - List tracked events
+// GET /api/events - List tracked events for the current user
 export async function GET(request: NextRequest) {
+  const user = await getUser(request);
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
   const { searchParams } = new URL(request.url);
   const keyId = searchParams.get("key_id");
   const gpmOnly = searchParams.get("gpm_only");
@@ -13,6 +17,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("tracked_events")
     .select("*")
+    .eq("user_id", user.id)
     .order("start_time", { ascending: false });
 
   if (keyId && keyId !== "all") {
@@ -38,14 +43,14 @@ export async function GET(request: NextRequest) {
 
 // POST /api/events - Create a tracked event
 export async function POST(request: NextRequest) {
+  const user = await getUser(request);
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
   const body = await request.json();
   const { summary, key_id, key_name, start_time, end_time, duration_minutes, event_date } = body;
 
   if (!summary || !key_id) {
-    return NextResponse.json(
-      { error: "summary and key_id are required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "summary and key_id are required" }, { status: 400 });
   }
 
   const { data, error } = await supabase
@@ -58,6 +63,7 @@ export async function POST(request: NextRequest) {
       end_time,
       duration_minutes: duration_minutes || 0,
       event_date: event_date || new Date().toISOString().split("T")[0],
+      user_id: user.id,
     })
     .select()
     .single();

@@ -14,6 +14,7 @@ import {
   Info,
   ChevronRight,
   Download,
+  FileDown,
   Shield,
   ArrowLeft,
   Loader2,
@@ -211,6 +212,13 @@ export default function SettingsPage() {
         <div className="mb-5 animate-fade-up delay-2">
           <p className="section-label">{t("settings.general")}</p>
           <div className="glow-card" style={{ overflow: "hidden" }}>
+            <SettingRow
+              icon={FileDown}
+              label={t("export.title")}
+              description={t("export.subtitle")}
+              onClick={() => router.push("/export")}
+            />
+            <div style={{ borderTop: "1px solid var(--app-border)" }} />
             <SettingRow
               icon={Download}
               label={t("settings.install")}

@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/categories - List all categories
-export async function GET() {
+// GET /api/categories - List all categories for the current user
+export async function GET(req: NextRequest) {
+  const user = await getUser(req);
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
   const { data, error } = await supabase
     .from("categories")
     .select("*")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -19,19 +24,19 @@ export async function GET() {
 
 // POST /api/categories - Create a new category
 export async function POST(request: NextRequest) {
+  const user = await getUser(request);
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
   const body = await request.json();
   const { name, description } = body;
 
   if (!name) {
-    return NextResponse.json(
-      { error: "Name is required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from("categories")
-    .insert({ name, description: description || null })
+    .insert({ name, description: description || null, user_id: user.id })
     .select()
     .single();
 
@@ -44,6 +49,9 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/categories - Update a category
 export async function PUT(request: NextRequest) {
+  const user = await getUser(request);
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
   const body = await request.json();
   const { id, name, description } = body;
 
@@ -55,6 +63,7 @@ export async function PUT(request: NextRequest) {
     .from("categories")
     .update({ name, description })
     .eq("id", id)
+    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -67,6 +76,9 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/categories - Delete a category
 export async function DELETE(request: NextRequest) {
+  const user = await getUser(request);
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
@@ -78,12 +90,14 @@ export async function DELETE(request: NextRequest) {
   await supabase
     .from("tracking_keys")
     .update({ category_id: null })
-    .eq("category_id", id);
+    .eq("category_id", id)
+    .eq("user_id", user.id);
 
   const { error } = await supabase
     .from("categories")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

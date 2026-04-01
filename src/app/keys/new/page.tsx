@@ -61,6 +61,7 @@ export default function NewKeyPage() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [taskName, setTaskName] = useState("");
   const [taskSearchTerm, setTaskSearchTerm] = useState("");
+  const [budgetHoursWeekly, setBudgetHoursWeekly] = useState<string>("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -229,13 +230,22 @@ export default function NewKeyPage() {
               <input
                 type="text"
                 className="input"
-                placeholder="z.B. GPM, Mathe …"
+                placeholder="z.B. GPM, Geschäftsprozess, Business Process"
                 value={searchKey}
                 onChange={(e) => setSearchKey(e.target.value)}
               />
               <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
-                {t("keys.searchKeyHint")}
+                {t("keys.searchKeyHintMulti")}
               </p>
+              {searchKey.includes(",") && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {searchKey.split(",").map((term, i) => term.trim() && (
+                    <span key={i} className="chip text-[10px]" style={{ background: `${autoColor}15`, color: autoColor, border: `1px solid ${autoColor}25` }}>
+                      {term.trim()}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Category */}
@@ -269,6 +279,25 @@ export default function NewKeyPage() {
                   onChange={(vals) => setCalendar(vals.length > 0 ? vals[0] : "")}
                 />
               )}
+            </div>
+
+            {/* Weekly Budget */}
+            <div>
+              <label className="block text-[12px] font-semibold text-[var(--app-text-muted)] mb-1.5 uppercase tracking-wider">
+                Wochenziel (Stunden)
+              </label>
+              <input
+                type="number"
+                className="input"
+                placeholder="z.B. 10"
+                value={budgetHoursWeekly}
+                onChange={(e) => setBudgetHoursWeekly(e.target.value)}
+                min="0"
+                step="0.5"
+              />
+              <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
+                Optional: Soll-Stunden pro Woche. Wird im Dashboard und Analytics als Fortschrittsbalken angezeigt.
+              </p>
             </div>
 
             {/* Color (auto-assigned) */}
@@ -518,9 +547,14 @@ export default function NewKeyPage() {
                     color: autoColor,
                     category_id: category || null,
                     calendar_id: calendar || null,
+                    budget_hours_weekly: budgetHoursWeekly ? parseFloat(budgetHoursWeekly) : null,
                   }),
                 });
-                if (!res.ok) throw new Error("Failed to create key");
+                if (!res.ok) {
+                  const errBody = await res.json().catch(() => ({}));
+                  console.error("API error:", res.status, errBody);
+                  throw new Error(errBody.error || "Failed to create key");
+                }
                 router.push("/keys");
               } catch (err) {
                 console.error("Error creating key:", err);

@@ -135,10 +135,57 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   };
 
+  // Auto-sync: check last sync time and sync if older than 5 minutes
+  const autoSyncTriggered = useState(false)[1];
   useEffect(() => {
-    if (session) loadData();
+    if (!session) return;
+    loadData();
+
+    // Check last sync time
+    fetch("/api/tracking")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.lastSyncAt) {
+          // Never synced — trigger sync
+          triggerAutoSync();
+          return;
+        }
+        const lastSync = new Date(data.lastSyncAt);
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        if (lastSync < fiveMinAgo) {
+          triggerAutoSync();
+        }
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  const triggerAutoSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/tracking", { method: "POST" });
+      const result = await res.json();
+      if (res.ok && (result.newEvents > 0 || (result.removedEvents ?? 0) > 0)) {
+        setSyncResult({
+          newEvents: result.newEvents || 0,
+          matched: result.matched || 0,
+          removedEvents: result.removedEvents || 0,
+          totalCalendarEvents: result.totalCalendarEvents || 0,
+          skippedDuplicates: result.skippedDuplicates || 0,
+          matchedSamples: result.matchedSamples || [],
+          debug: result.debug || [],
+        });
+        loadData();
+      } else if (res.ok) {
+        // Silently succeeded with no changes — just reload data
+        loadData();
+      }
+    } catch {
+      // Silent fail for auto-sync
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -291,6 +338,26 @@ export default function DashboardPage() {
 
     return perKey;
   }, [viewMode, keys, trackedEvents, calendarEvents]);
+
+  // Budget: minutes per key this week
+  const weeklyMinutesByKey = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - day + (day === 0 ? -6 : 1));
+    monday.setHours(0, 0, 0, 0);
+    const nextMonday = new Date(monday);
+    nextMonday.setDate(nextMonday.getDate() + 7);
+
+    const map = new Map<string, number>();
+    for (const e of trackedEvents) {
+      const d = new Date(e.event_date);
+      if (d >= monday && d < nextMonday) {
+        map.set(e.key_id, (map.get(e.key_id) || 0) + e.duration_minutes);
+      }
+    }
+    return map;
+  }, [trackedEvents]);
 
   // Compute totals from filtered stats
   const totalHours = useMemo(() => {
@@ -704,7 +771,7 @@ export default function DashboardPage() {
                           <Link
                             key={key.id}
                             href={`/keys/${key.id}/edit`}
-                            className="flex items-center justify-between py-3 px-1 rounded-lg hover:bg-[var(--app-accent-soft)] transition-all group"
+                            className="block py-3 px-1 rounded-lg hover:bg-[var(--app-accent-soft)] transition-all group"
                             style={{
                               textDecoration: "none",
                               color: "inherit",
@@ -714,33 +781,51 @@ export default function DashboardPage() {
                                   : "none",
                             }}
                           >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: key.color }}
-                              />
-                              <span className="text-[14px] font-semibold">
-                                {key.name}
-                              </span>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: key.color }}
+                                />
+                                <span className="text-[14px] font-semibold">
+                                  {key.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[12px] text-[var(--app-text-muted)] tabular-nums">
+                                  {formatMinutes(
+                                    filteredKeyStats.get(key.id)?.minutes ??
+                                      key.total_minutes
+                                  )}
+                                </span>
+                                <span className="text-[11px] text-[var(--app-text-muted)]">
+                                  ·{" "}
+                                  {filteredKeyStats.get(key.id)?.events ??
+                                    key.event_count}{" "}
+                                  Events
+                                </span>
+                                <ChevronRight
+                                  size={14}
+                                  className="text-[var(--app-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity"
+                                />
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-[12px] text-[var(--app-text-muted)] tabular-nums">
-                                {formatMinutes(
-                                  filteredKeyStats.get(key.id)?.minutes ??
-                                    key.total_minutes
-                                )}
-                              </span>
-                              <span className="text-[11px] text-[var(--app-text-muted)]">
-                                ·{" "}
-                                {filteredKeyStats.get(key.id)?.events ??
-                                  key.event_count}{" "}
-                                Events
-                              </span>
-                              <ChevronRight
-                                size={14}
-                                className="text-[var(--app-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity"
-                              />
-                            </div>
+                            {key.budget_hours_weekly != null && key.budget_hours_weekly > 0 && (() => {
+                              const spent = weeklyMinutesByKey.get(key.id) || 0;
+                              const budgetMin = key.budget_hours_weekly! * 60;
+                              const pct = Math.min((spent / budgetMin) * 100, 100);
+                              const over = spent > budgetMin;
+                              return (
+                                <div className="mt-2 ml-6">
+                                  <div style={{ height: "6px", borderRadius: "3px", background: "var(--app-accent-soft)", overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${pct}%`, borderRadius: "3px", background: over ? "#FF3B30" : key.color, transition: "width 0.4s ease" }} />
+                                  </div>
+                                  <span className="text-[10px]" style={{ color: over ? "#FF3B30" : "var(--app-text-muted)" }}>
+                                    {formatMinutes(spent)} / {key.budget_hours_weekly}h Wochenziel
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </Link>
                         ))}
                       </div>
