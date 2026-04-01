@@ -73,126 +73,80 @@ function KeyPicker({
 }) {
   return (
     <>
-      {/* Backdrop */}
+      {/* Invisible backdrop to catch outside clicks */}
       <div
         onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 40,
-          background: "rgba(0,0,0,0.4)",
-          backdropFilter: "blur(2px)",
-          WebkitBackdropFilter: "blur(2px)",
-        }}
+        style={{ position: "fixed", inset: 0, zIndex: 40 }}
       />
 
-      {/* Sheet — same visual language as NavBar */}
+      {/* Floating menu above NavBar */}
       <div
         style={{
           position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
+          bottom: "calc(72px + env(safe-area-inset-bottom))",
+          left: "50%",
+          transform: "translateX(-50%)",
           zIndex: 50,
-          maxWidth: "640px",
-          margin: "0 auto",
+          width: "200px",
           background: "var(--app-surface)",
-          borderTop: "1px solid var(--app-border)",
-          borderTopLeftRadius: "20px",
-          borderTopRightRadius: "20px",
-          paddingBottom: "calc(80px + env(safe-area-inset-bottom))",
-          animation: "slideUp 0.2s ease",
+          border: "1px solid var(--app-border)",
+          borderRadius: "12px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+          overflow: "hidden",
+          animation: "fadeUp 0.15s ease",
         }}
       >
-        {/* Drag handle */}
-        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
-          <div
-            style={{
-              width: "32px",
-              height: "3px",
-              borderRadius: "2px",
-              background: "var(--app-border-strong)",
-            }}
-          />
-        </div>
-
-        {/* Key list — compact rows like nav items */}
-        <div
-          style={{
-            padding: "4px 8px 8px",
-            display: "flex",
-            flexDirection: "column",
-            maxHeight: "50vh",
-            overflowY: "auto",
-          }}
-        >
-          {keys.map((k, i) => {
-            const isActive = i === currentIdx;
-            const kColor = k.color || "#7C7CFF";
-            return (
-              <button
-                key={k.id}
-                onClick={() => { onSelect(i); onClose(); }}
+        {keys.map((k, i) => {
+          const isActive = i === currentIdx;
+          const kColor = k.color || "#7C7CFF";
+          return (
+            <button
+              key={k.id}
+              onClick={() => { onSelect(i); onClose(); }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "9px",
+                padding: "9px 14px",
+                width: "100%",
+                background: "transparent",
+                border: "none",
+                borderBottom: i < keys.length - 1 ? "1px solid var(--app-border)" : "none",
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "9px 12px",
-                  borderRadius: "12px",
-                  background: isActive ? `${kColor}12` : "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  width: "100%",
-                  textAlign: "left",
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: kColor,
+                  flexShrink: 0,
+                  opacity: isActive ? 1 : 0.5,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? "var(--app-fg)" : "var(--app-text-muted)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
-                {/* Color pip */}
-                <div
-                  style={{
-                    width: "7px",
-                    height: "7px",
-                    borderRadius: "50%",
-                    background: kColor,
-                    flexShrink: 0,
-                    opacity: isActive ? 1 : 0.6,
-                  }}
-                />
-                {/* Name */}
-                <span
-                  style={{
-                    flex: 1,
-                    fontSize: "14px",
-                    fontWeight: isActive ? 600 : 400,
-                    color: isActive ? "var(--app-fg)" : "var(--app-text-muted)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {k.name}
-                </span>
-                {/* Active indicator */}
-                {isActive && (
-                  <div
-                    style={{
-                      width: "5px",
-                      height: "5px",
-                      borderRadius: "50%",
-                      background: kColor,
-                      flexShrink: 0,
-                    }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
+                {k.name}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to   { transform: translateY(0); }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
     </>
