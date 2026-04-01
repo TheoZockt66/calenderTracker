@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -34,6 +34,7 @@ export function NavBar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [activeIndex, setActiveIndex] = useState(0);
+  const verlaufRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
     const idx = NAV_ITEMS.findIndex((item) => {
@@ -58,12 +59,20 @@ export function NavBar() {
             <Link
               key={item.name}
               href={item.url}
+              ref={item.url === KEY_VIZ_URL ? verlaufRef : undefined}
               className={`navbar__item ${isActive ? "navbar__item--active" : ""}`}
               onClick={
                 isVerlaufActive
                   ? (e) => {
                       e.preventDefault();
-                      window.dispatchEvent(new CustomEvent("open-key-picker"));
+                      const rect = verlaufRef.current?.getBoundingClientRect();
+                      window.dispatchEvent(
+                        new CustomEvent("toggle-key-picker", {
+                          detail: {
+                            centerX: rect ? rect.left + rect.width / 2 : window.innerWidth / 2,
+                          },
+                        })
+                      );
                     }
                   : undefined
               }

@@ -63,14 +63,26 @@ function GlassCard({
 function KeyPicker({
   keys,
   currentIdx,
+  centerX,
   onSelect,
   onClose,
 }: {
   keys: TrackingKey[];
   currentIdx: number;
+  centerX: number | null;
   onSelect: (i: number) => void;
   onClose: () => void;
 }) {
+  const menuWidth = 200;
+  const margin = 12;
+  const cx = centerX ?? window.innerWidth / 2;
+  // Clamp so menu stays within viewport
+  const rawLeft = cx - menuWidth / 2;
+  const left = Math.min(
+    Math.max(rawLeft, margin),
+    window.innerWidth - menuWidth - margin
+  );
+
   return (
     <>
       {/* Invisible backdrop to catch outside clicks */}
@@ -84,10 +96,9 @@ function KeyPicker({
         style={{
           position: "fixed",
           bottom: "calc(72px + env(safe-area-inset-bottom))",
-          left: "50%",
-          transform: "translateX(-50%)",
+          left: `${left}px`,
           zIndex: 50,
-          width: "200px",
+          width: `${menuWidth}px`,
           background: "var(--app-surface)",
           border: "1px solid var(--app-border)",
           borderRadius: "12px",
@@ -145,8 +156,8 @@ function KeyPicker({
 
       <style>{`
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateX(-50%) translateY(6px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </>
@@ -165,6 +176,7 @@ export default function KeyVisualizationPage() {
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerX, setPickerX] = useState<number | null>(null);
 
   const touchStartX = useRef<number>(0);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -176,11 +188,15 @@ export default function KeyVisualizationPage() {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
 
-  // Listen for NavBar trigger
+  // Listen for NavBar toggle trigger
   useEffect(() => {
-    const handler = () => setShowPicker(true);
-    window.addEventListener("open-key-picker", handler);
-    return () => window.removeEventListener("open-key-picker", handler);
+    const handler = (e: Event) => {
+      const centerX = (e as CustomEvent).detail?.centerX ?? null;
+      setPickerX(centerX);
+      setShowPicker((prev) => !prev);
+    };
+    window.addEventListener("toggle-key-picker", handler);
+    return () => window.removeEventListener("toggle-key-picker", handler);
   }, []);
 
   // Load all keys once
@@ -574,11 +590,12 @@ export default function KeyVisualizationPage() {
         )}
       </div>
 
-      {/* ── Key Picker Bottom Sheet ──────────────────────────────── */}
+      {/* ── Key Picker Popup ─────────────────────────────────────── */}
       {showPicker && (
         <KeyPicker
           keys={keys}
           currentIdx={currentIdx}
+          centerX={pickerX}
           onSelect={setCurrentIdx}
           onClose={() => setShowPicker(false)}
         />
