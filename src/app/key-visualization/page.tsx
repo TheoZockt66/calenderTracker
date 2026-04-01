@@ -58,6 +58,147 @@ function GlassCard({
   );
 }
 
+// ─── Key Picker Bottom Sheet ──────────────────────────────────────────────────
+
+function KeyPicker({
+  keys,
+  currentIdx,
+  onSelect,
+  onClose,
+}: {
+  keys: TrackingKey[];
+  currentIdx: number;
+  onSelect: (i: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 40,
+          background: "rgba(0,0,0,0.4)",
+          backdropFilter: "blur(2px)",
+          WebkitBackdropFilter: "blur(2px)",
+        }}
+      />
+
+      {/* Sheet — same visual language as NavBar */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          maxWidth: "640px",
+          margin: "0 auto",
+          background: "var(--app-surface)",
+          borderTop: "1px solid var(--app-border)",
+          borderTopLeftRadius: "20px",
+          borderTopRightRadius: "20px",
+          paddingBottom: "calc(80px + env(safe-area-inset-bottom))",
+          animation: "slideUp 0.2s ease",
+        }}
+      >
+        {/* Drag handle */}
+        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+          <div
+            style={{
+              width: "32px",
+              height: "3px",
+              borderRadius: "2px",
+              background: "var(--app-border-strong)",
+            }}
+          />
+        </div>
+
+        {/* Key list — compact rows like nav items */}
+        <div
+          style={{
+            padding: "4px 8px 8px",
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: "50vh",
+            overflowY: "auto",
+          }}
+        >
+          {keys.map((k, i) => {
+            const isActive = i === currentIdx;
+            const kColor = k.color || "#7C7CFF";
+            return (
+              <button
+                key={k.id}
+                onClick={() => { onSelect(i); onClose(); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "9px 12px",
+                  borderRadius: "12px",
+                  background: isActive ? `${kColor}12` : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  width: "100%",
+                  textAlign: "left",
+                }}
+              >
+                {/* Color pip */}
+                <div
+                  style={{
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    background: kColor,
+                    flexShrink: 0,
+                    opacity: isActive ? 1 : 0.6,
+                  }}
+                />
+                {/* Name */}
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: "14px",
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? "var(--app-fg)" : "var(--app-text-muted)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {k.name}
+                </span>
+                {/* Active indicator */}
+                {isActive && (
+                  <div
+                    style={{
+                      width: "5px",
+                      height: "5px",
+                      borderRadius: "50%",
+                      background: kColor,
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+      `}</style>
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function KeyVisualizationPage() {
@@ -69,6 +210,7 @@ export default function KeyVisualizationPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
 
   const touchStartX = useRef<number>(0);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -79,6 +221,13 @@ export default function KeyVisualizationPage() {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
+
+  // Listen for NavBar trigger
+  useEffect(() => {
+    const handler = () => setShowPicker(true);
+    window.addEventListener("open-key-picker", handler);
+    return () => window.removeEventListener("open-key-picker", handler);
+  }, []);
 
   // Load all keys once
   useEffect(() => {
@@ -147,7 +296,7 @@ export default function KeyVisualizationPage() {
     else if (diff < -50) goPrev();
   }
 
-  // ── Loading / Auth states ──────────────────────────────────────────────────
+  // ── Loading / Auth states ─────────────────────────────────────────────────
 
   if (status === "loading" || loadingKeys) {
     return (
@@ -199,7 +348,7 @@ export default function KeyVisualizationPage() {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* ── Fixed Header ──────────────────────────────────────── */}
+      {/* ── Fixed Header ─────────────────────────────────────────── */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 10 }}>
         <div
           ref={headerRef}
@@ -212,18 +361,31 @@ export default function KeyVisualizationPage() {
             borderBottom: "1px solid var(--app-border)",
           }}
         >
-          {/* Key name */}
-          <h1
+          {/* Key name — tappable to open picker */}
+          <button
+            onClick={() => setShowPicker(true)}
             style={{
-              fontSize: "19px",
-              fontWeight: 700,
-              lineHeight: 1.2,
-              textAlign: "center",
+              display: "block",
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
               marginBottom: "10px",
             }}
           >
-            {key.name}
-          </h1>
+            <h1
+              style={{
+                fontSize: "19px",
+                fontWeight: 700,
+                lineHeight: 1.2,
+                textAlign: "center",
+                color: "var(--app-fg)",
+              }}
+            >
+              {key.name}
+            </h1>
+          </button>
 
           {/* Pill-dot navigation */}
           <div
@@ -301,12 +463,7 @@ export default function KeyVisualizationPage() {
                 </p>
               </div>
               <div style={{ textAlign: "right" }}>
-                <p
-                  style={{
-                    fontSize: "11px",
-                    color: "var(--app-text-muted)",
-                  }}
-                >
+                <p style={{ fontSize: "11px", color: "var(--app-text-muted)" }}>
                   {key.event_count} Events
                 </p>
               </div>
@@ -323,13 +480,7 @@ export default function KeyVisualizationPage() {
         style={{ maxWidth: "640px", margin: "0 auto", padding: "14px 20px 64px" }}
       >
         {loadingEvents ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              padding: "48px 0",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
             <Loader2
               size={24}
               className="animate-spin"
@@ -337,13 +488,7 @@ export default function KeyVisualizationPage() {
             />
           </div>
         ) : (
-          <div
-            style={{
-              marginTop: "16px",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
+          <div style={{ marginTop: "16px", display: "flex", flexDirection: "column" }}>
             {events.length === 0 && (
               <p
                 style={{
@@ -409,20 +554,12 @@ export default function KeyVisualizationPage() {
                       />
                     </div>
                     {hasConnector && (
-                      <div
-                        style={{ width: "16px", flex: 1, background: color }}
-                      />
+                      <div style={{ width: "16px", flex: 1, background: color }} />
                     )}
                   </div>
 
                   {/* Content */}
-                  <div
-                    style={{
-                      flex: 1,
-                      paddingTop: "5px",
-                      paddingBottom: "14px",
-                    }}
-                  >
+                  <div style={{ flex: 1, paddingTop: "5px", paddingBottom: "14px" }}>
                     <span
                       style={{
                         fontSize: "10px",
@@ -454,12 +591,7 @@ export default function KeyVisualizationPage() {
                         flexWrap: "wrap",
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--app-text-muted)",
-                        }}
-                      >
+                      <span style={{ fontSize: "11px", color: "var(--app-text-muted)" }}>
                         {formatTime(event.start_time)} –{" "}
                         {formatTime(event.end_time)}
                       </span>
@@ -487,6 +619,16 @@ export default function KeyVisualizationPage() {
           </div>
         )}
       </div>
+
+      {/* ── Key Picker Bottom Sheet ──────────────────────────────── */}
+      {showPicker && (
+        <KeyPicker
+          keys={keys}
+          currentIdx={currentIdx}
+          onSelect={setCurrentIdx}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     </main>
   );
 }

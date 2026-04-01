@@ -14,6 +14,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+const KEY_VIZ_URL = "/key-visualization";
+
 interface NavItem {
   name: string;
   url: string;
@@ -49,12 +51,22 @@ export function NavBar() {
         {NAV_ITEMS.map((item, index) => {
           const Icon = item.icon;
           const isActive = activeIndex === index;
+          const isVerlaufActive =
+            item.url === KEY_VIZ_URL && pathname === KEY_VIZ_URL;
 
           return (
             <Link
               key={item.name}
               href={item.url}
               className={`navbar__item ${isActive ? "navbar__item--active" : ""}`}
+              onClick={
+                isVerlaufActive
+                  ? (e) => {
+                      e.preventDefault();
+                      window.dispatchEvent(new CustomEvent("open-key-picker"));
+                    }
+                  : undefined
+              }
             >
               <Icon size={20} strokeWidth={2.5} />
               <span className="navbar__label">{item.name}</span>
