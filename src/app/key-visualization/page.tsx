@@ -321,17 +321,6 @@ export default function KeyVisualizationPage() {
                 >
                   {key.event_count} Events
                 </p>
-                {key.budget_hours_weekly && (
-                  <p
-                    style={{
-                      fontSize: "11px",
-                      color: "var(--app-text-muted)",
-                      marginTop: "2px",
-                    }}
-                  >
-                    Budget: {key.budget_hours_weekly}h / Woche
-                  </p>
-                )}
               </div>
             </div>
           </GlassCard>
