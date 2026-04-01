@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Home, ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
+import { Clock, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatMinutes } from "@/lib/mock-data";
 import type { TrackingKey, TrackedEvent } from "@/lib/types";
@@ -212,62 +212,50 @@ export default function KeyVisualizationPage() {
             borderBottom: "1px solid var(--app-border)",
           }}
         >
-          {/* Nav row */}
+          {/* Key name */}
+          <h1
+            style={{
+              fontSize: "19px",
+              fontWeight: 700,
+              lineHeight: 1.2,
+              textAlign: "center",
+              marginBottom: "10px",
+            }}
+          >
+            {key.name}
+          </h1>
+
+          {/* Pill-dot navigation */}
           <div
             style={{
               display: "flex",
+              gap: "5px",
+              justifyContent: "center",
               alignItems: "center",
-              justifyContent: "space-between",
               marginBottom: "12px",
+              flexWrap: "wrap",
             }}
           >
-            <Link
-              href="/dashboard"
-              className="btn-ghost"
-              style={{ padding: "7px 11px" }}
-            >
-              <Home size={15} />
-            </Link>
-
-            <div style={{ textAlign: "center" }}>
-              <h1 style={{ fontSize: "19px", fontWeight: 700, lineHeight: 1.2 }}>
-                {key.name}
-              </h1>
-              <p
-                style={{
-                  fontSize: "11px",
-                  color: "var(--app-text-muted)",
-                  marginTop: "2px",
-                }}
-              >
-                {currentIdx + 1} / {keys.length}
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: "5px" }}>
+            {keys.map((k, i) => (
               <button
-                onClick={goPrev}
-                disabled={currentIdx === 0}
-                className="btn-ghost"
+                key={k.id}
+                onClick={() => setCurrentIdx(i)}
                 style={{
-                  padding: "7px 9px",
-                  opacity: currentIdx === 0 ? 0.2 : 1,
+                  width: i === currentIdx ? "22px" : "7px",
+                  height: "7px",
+                  borderRadius: "4px",
+                  background:
+                    i === currentIdx
+                      ? k.color || "#7C7CFF"
+                      : "var(--app-border-strong)",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  transition: "width 0.25s ease, background 0.25s ease",
+                  flexShrink: 0,
                 }}
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <button
-                onClick={goNext}
-                disabled={currentIdx === keys.length - 1}
-                className="btn-ghost"
-                style={{
-                  padding: "7px 9px",
-                  opacity: currentIdx === keys.length - 1 ? 0.2 : 1,
-                }}
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
+              />
+            ))}
           </div>
 
           {/* Color bar */}
