@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -135,57 +135,11 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   };
 
-  // Auto-sync: check last sync time and sync if older than 5 minutes
-  const autoSyncTriggered = useState(false)[1];
   useEffect(() => {
     if (!session) return;
     loadData();
-
-    // Check last sync time
-    fetch("/api/tracking")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.lastSyncAt) {
-          // Never synced — trigger sync
-          triggerAutoSync();
-          return;
-        }
-        const lastSync = new Date(data.lastSyncAt);
-        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-        if (lastSync < fiveMinAgo) {
-          triggerAutoSync();
-        }
-      })
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
-
-  const triggerAutoSync = async () => {
-    setSyncing(true);
-    try {
-      const res = await fetch("/api/tracking", { method: "POST" });
-      const result = await res.json();
-      if (res.ok && (result.newEvents > 0 || (result.removedEvents ?? 0) > 0)) {
-        setSyncResult({
-          newEvents: result.newEvents || 0,
-          matched: result.matched || 0,
-          removedEvents: result.removedEvents || 0,
-          totalCalendarEvents: result.totalCalendarEvents || 0,
-          skippedDuplicates: result.skippedDuplicates || 0,
-          matchedSamples: result.matchedSamples || [],
-          debug: result.debug || [],
-        });
-        loadData();
-      } else if (res.ok) {
-        // Silently succeeded with no changes — just reload data
-        loadData();
-      }
-    } catch {
-      // Silent fail for auto-sync
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -205,6 +159,8 @@ export default function DashboardPage() {
           debug: result.debug || [],
         });
         loadData();
+      } else if (result.error === "InsufficientScopeError") {
+        await signOut({ callbackUrl: "/" });
       } else {
         setSyncResult({
           newEvents: 0,

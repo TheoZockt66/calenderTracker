@@ -71,18 +71,7 @@ export async function POST(req: NextRequest) {
 
     debugLog.push(`${existingSet.size} bereits getrackte Events in DB.`);
 
-    // 3. Get stored sync tokens for incremental sync
-    const { data: storedTokens } = await supabase
-      .from("sync_tokens")
-      .select("calendar_id, sync_token")
-      .eq("user_id", user.id);
-
-    const syncTokenMap = new Map<string, string>();
-    for (const st of storedTokens || []) {
-      syncTokenMap.set(st.calendar_id, st.sync_token);
-    }
-
-    // 4. Fetch calendar events (incremental or full)
+    // 4. Fetch calendar events (full sync always — incremental sync misses past events that were planned before the last sync token)
     const now = new Date();
     const timeMin = new Date("2026-01-01T00:00:00Z").toISOString();
     const futureDate = new Date(now);
@@ -94,11 +83,12 @@ export async function POST(req: NextRequest) {
       calendarList = await calendar.calendarList.list();
     } catch (calErr) {
       const msg = calErr instanceof Error ? calErr.message : "Unknown";
+      const isInsufficientScope = msg.includes("insufficient authentication scopes") || msg.includes("insufficientPermissions");
       return NextResponse.json({
-        error: "Google Calendar API Fehler",
+        error: isInsufficientScope ? "InsufficientScopeError" : "Google Calendar API Fehler",
         details: msg,
         debug: [...debugLog, `Fehler beim Abrufen der Kalender-Liste: ${msg}`],
-      }, { status: 500 });
+      }, { status: isInsufficientScope ? 403 : 500 });
     }
 
     const calendars = calendarList.data.items || [];
@@ -116,60 +106,19 @@ export async function POST(req: NextRequest) {
     }
 
     const allEvents: RawEvent[] = [];
-    let usedIncremental = false;
 
     for (const cal of calendars) {
       const calId = cal.id!;
-      const existingSyncToken = syncTokenMap.get(calId);
 
       try {
-        let eventsRes;
-        let isIncremental = false;
-
-        // Try incremental sync with stored syncToken
-        if (existingSyncToken) {
-          try {
-            eventsRes = await calendar.events.list({
-              calendarId: calId,
-              syncToken: existingSyncToken,
-              maxResults: 2500,
-            });
-            isIncremental = true;
-            usedIncremental = true;
-            debugLog.push(`↻ Kalender "${cal.summary}": Inkrementeller Sync.`);
-          } catch (syncErr: any) {
-            // 410 Gone = syncToken invalid, do full sync
-            if (syncErr?.code === 410 || syncErr?.status === 410) {
-              debugLog.push(`↻ Kalender "${cal.summary}": SyncToken abgelaufen, voller Sync.`);
-              eventsRes = null;
-            } else {
-              throw syncErr;
-            }
-          }
-        }
-
-        // Full sync (no token or token expired)
-        if (!eventsRes) {
-          eventsRes = await calendar.events.list({
-            calendarId: calId,
-            timeMin,
-            timeMax,
-            singleEvents: true,
-            orderBy: "startTime",
-            maxResults: 2500,
-          });
-        }
-
-        // Store new syncToken
-        const newSyncToken = eventsRes.data.nextSyncToken;
-        if (newSyncToken) {
-          await supabase
-            .from("sync_tokens")
-            .upsert(
-              { user_id: user.id, calendar_id: calId, sync_token: newSyncToken, updated_at: new Date().toISOString() },
-              { onConflict: "user_id,calendar_id" }
-            );
-        }
+        const eventsRes = await calendar.events.list({
+          calendarId: calId,
+          timeMin,
+          timeMax,
+          singleEvents: true,
+          orderBy: "startTime",
+          maxResults: 2500,
+        });
 
         const events = (eventsRes.data.items || []).map((event) => ({
           id: event.id || "",
@@ -188,7 +137,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    debugLog.push(`${allEvents.length} Kalender-Events abgerufen${usedIncremental ? " (inkrementell)" : ""}.`);
+    debugLog.push(`${allEvents.length} Kalender-Events abgerufen.`);
 
     // 5. Match events against keys (supports multiple comma-separated search terms)
     let totalMatched = 0;
@@ -279,8 +228,7 @@ export async function POST(req: NextRequest) {
     let removedMinutes = 0;
     const removedFromKeys = new Map<string, { minutes: number; count: number }>();
 
-    // Only cleanup on full sync (not incremental, as incremental may not have all events)
-    if (!usedIncremental && existingEvents && existingEvents.length > 0) {
+    if (existingEvents && existingEvents.length > 0) {
       for (const tracked of existingEvents) {
         const sig = `${tracked.summary}|${new Date(tracked.start_time).getTime()}`;
         if (!calendarEventSignatures.has(sig)) {
@@ -344,7 +292,6 @@ export async function POST(req: NextRequest) {
       removedEvents: removedCount,
       skippedDuplicates,
       keysUpdated: affectedKeyIds.size,
-      incremental: usedIncremental,
       matchedSamples,
       debug: debugLog,
     });

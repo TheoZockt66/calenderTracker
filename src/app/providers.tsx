@@ -2,7 +2,8 @@
 
 import { MantineProvider, createTheme, MantineColorsTuple } from "@mantine/core";
 import { I18nProvider } from "@/lib/i18n";
-import { SessionProvider } from "next-auth/react";
+import { SessionProvider, useSession, signOut } from "next-auth/react";
+import { useEffect } from "react";
 
 const darkColors: MantineColorsTuple = [
   '#1a1a1a',
@@ -88,9 +89,34 @@ const theme = createTheme({
   },
 });
 
+function SessionWatcher() {
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    if ((session as any)?.error === "RefreshAccessTokenError") {
+      signOut({ callbackUrl: "/" });
+      return;
+    }
+    if (!session) return;
+
+    // Auto-sync on session start (app load / page refresh)
+    fetch("/api/tracking", { method: "POST" })
+      .then((r) => r.json())
+      .then((result) => {
+        if (result.error === "InsufficientScopeError") {
+          signOut({ callbackUrl: "/" });
+        }
+      })
+      .catch(() => {});
+  }, [session]);
+
+  return null;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
+      <SessionWatcher />
       <MantineProvider theme={theme} defaultColorScheme="dark">
         <I18nProvider>{children}</I18nProvider>
       </MantineProvider>

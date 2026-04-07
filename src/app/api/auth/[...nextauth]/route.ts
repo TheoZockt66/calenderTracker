@@ -41,6 +41,13 @@ async function refreshAccessToken(token: any) {
     const data = await response.json();
 
     if (!response.ok) {
+      // invalid_grant means the refresh token is revoked/expired — clear it from DB
+      if (data.error === "invalid_grant" && token.sub) {
+        await supabase
+          .from("users")
+          .update({ refresh_token: null, access_token: null })
+          .eq("google_id", token.sub);
+      }
       throw new Error(data.error || "refresh failed");
     }
 
