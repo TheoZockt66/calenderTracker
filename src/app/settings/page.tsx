@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMantineColorScheme } from "@mantine/core";
 import { useI18n } from "@/lib/i18n";
+import { usePwaInstall } from "@/lib/pwa-install";
 import { Switch } from "@/components/ui/Switch";
 import {
   Globe,
@@ -89,7 +90,7 @@ export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const { canInstall, isInstalled, install } = usePwaInstall();
 
   const isDarkMode = colorScheme === "dark";
 
@@ -97,25 +98,12 @@ export default function SettingsPage() {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
   const handleDarkModeToggle = (checked: boolean) => {
     setColorScheme(checked ? "dark" : "light");
   };
 
   const handleInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      setDeferredPrompt(null);
-    }
+    await install();
   };
 
   if (status === "loading") {
@@ -222,8 +210,14 @@ export default function SettingsPage() {
             <SettingRow
               icon={Download}
               label={t("settings.install")}
-              description={t("settings.installDesc")}
-              onClick={handleInstall}
+              description={
+                isInstalled
+                  ? "CalendarTracker ist bereits installiert."
+                  : canInstall
+                    ? t("settings.installDesc")
+                    : "Nutze das Installieren Menü deines Browsers."
+              }
+              onClick={canInstall && !isInstalled ? handleInstall : undefined}
             />
             <div style={{ borderTop: "1px solid var(--app-border)" }} />
             <SettingRow

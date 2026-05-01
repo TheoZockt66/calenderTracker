@@ -16,6 +16,12 @@ function matchesSearchKey(summary: string, searchKey: string): boolean {
   return terms.some((term) => summaryLower.includes(term));
 }
 
+function isWithinLifetime(eventDate: string, start?: string | null, end?: string | null): boolean {
+  if (start && eventDate < start) return false;
+  if (end && eventDate > end) return false;
+  return true;
+}
+
 /**
  * POST /api/tracking
  * Scans Google Calendar events and matches them against tracking keys.
@@ -60,7 +66,7 @@ export async function POST(req: NextRequest) {
     // 2. Get existing tracked event IDs to prevent duplicates
     const { data: existingEvents } = await supabase
       .from("tracked_events")
-      .select("id, summary, start_time, key_id")
+      .select("id, summary, start_time, key_id, event_date")
       .eq("user_id", user.id);
 
     const existingSet = new Set(
@@ -167,6 +173,8 @@ export async function POST(req: NextRequest) {
       for (const key of keys) {
         const rawSearchKey = key.search_key || key.name || "";
         if (!rawSearchKey.trim()) continue;
+        const eventDate = event.start.split("T")[0];
+        if (!isWithinLifetime(eventDate, key.lifetime_start, key.lifetime_end)) continue;
 
         const matches = matchesSearchKey(event.summary, rawSearchKey);
 
@@ -182,7 +190,6 @@ export async function POST(req: NextRequest) {
             continue;
           }
 
-          const eventDate = event.start.split("T")[0];
           const { error: insertError } = await supabase
             .from("tracked_events")
             .insert({
@@ -229,9 +236,16 @@ export async function POST(req: NextRequest) {
     const removedFromKeys = new Map<string, { minutes: number; count: number }>();
 
     if (existingEvents && existingEvents.length > 0) {
+      const keyById = new Map(keys.map((key) => [key.id, key]));
       for (const tracked of existingEvents) {
         const sig = `${tracked.summary}|${new Date(tracked.start_time).getTime()}`;
-        if (!calendarEventSignatures.has(sig)) {
+        const key = keyById.get(tracked.key_id);
+        const invalidForKey =
+          !key ||
+          !matchesSearchKey(tracked.summary || "", key.search_key || key.name || "") ||
+          !isWithinLifetime(tracked.event_date, key.lifetime_start, key.lifetime_end);
+
+        if (!calendarEventSignatures.has(sig) || invalidForKey) {
           const { data: deleted } = await supabase
             .from("tracked_events")
             .delete()
@@ -257,6 +271,7 @@ export async function POST(req: NextRequest) {
 
     // 7. Recalculate stats for all affected keys
     const affectedKeyIds = new Set([
+      ...keys.map((key) => key.id),
       ...keyUpdates.keys(),
       ...removedFromKeys.keys(),
     ]);

@@ -15,6 +15,12 @@ function matchesSearchKey(summary: string, searchKey: string): boolean {
   return terms.some((term) => summaryLower.includes(term));
 }
 
+function isWithinLifetime(eventDate: string, start?: string | null, end?: string | null): boolean {
+  if (start && eventDate < start) return false;
+  if (end && eventDate > end) return false;
+  return true;
+}
+
 // GET /api/keys - List all tracking keys for the current user
 export async function GET(req: NextRequest) {
   const user = await getUser(req);
@@ -42,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, search_key, color, category_id, calendar_id, budget_hours_weekly } = body;
+    const { name, search_key, color, category_id, calendar_id, budget_hours_weekly, lifetime_start, lifetime_end } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -55,6 +61,8 @@ export async function POST(request: NextRequest) {
       category_id: category_id || null,
       calendar_id: calendar_id || null,
       budget_hours_weekly: budget_hours_weekly ?? null,
+      lifetime_start: lifetime_start || null,
+      lifetime_end: lifetime_end || null,
       total_minutes: 0,
       event_count: 0,
       user_id: user.id,
@@ -86,7 +94,7 @@ export async function PUT(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const body = await request.json();
-  const { id, name, search_key, color, category_id, calendar_id, budget_hours_weekly } = body;
+  const { id, name, search_key, color, category_id, calendar_id, budget_hours_weekly, lifetime_start, lifetime_end } = body;
 
   if (!id) {
     return NextResponse.json({ error: "ID is required" }, { status: 400 });
@@ -95,7 +103,16 @@ export async function PUT(request: NextRequest) {
   // 1. Update the key itself
   const { data, error } = await supabase
     .from("tracking_keys")
-    .update({ name, search_key, color, category_id, calendar_id, budget_hours_weekly: budget_hours_weekly ?? null })
+    .update({
+      name,
+      search_key,
+      color,
+      category_id,
+      calendar_id,
+      budget_hours_weekly: budget_hours_weekly ?? null,
+      lifetime_start: lifetime_start || null,
+      lifetime_end: lifetime_end || null,
+    })
     .eq("id", id)
     .eq("user_id", user.id)
     .select()
@@ -110,14 +127,17 @@ export async function PUT(request: NextRequest) {
   // 2. Re-evaluate existing tracked events against the new search_key
   const { data: trackedEvents } = await supabase
     .from("tracked_events")
-    .select("id, summary, duration_minutes")
+    .select("id, summary, duration_minutes, event_date")
     .eq("key_id", id);
 
   let removedCount = 0;
 
   if (trackedEvents && newSearchKey) {
     for (const event of trackedEvents) {
-      if (!matchesSearchKey(event.summary || "", newSearchKey)) {
+      if (
+        !matchesSearchKey(event.summary || "", newSearchKey) ||
+        !isWithinLifetime(event.event_date, lifetime_start, lifetime_end)
+      ) {
         await supabase.from("tracked_events").delete().eq("id", event.id);
         removedCount++;
       }

@@ -113,6 +113,8 @@ export interface Database {
           total_minutes: number;
           event_count: number;
           budget_hours_weekly: number | null;
+          lifetime_start: string | null;
+          lifetime_end: string | null;
           created_at: string;
         };
         Insert: {
@@ -126,6 +128,8 @@ export interface Database {
           total_minutes?: number;
           event_count?: number;
           budget_hours_weekly?: number | null;
+          lifetime_start?: string | null;
+          lifetime_end?: string | null;
           created_at?: string;
         };
         Update: {
@@ -139,6 +143,8 @@ export interface Database {
           total_minutes?: number;
           event_count?: number;
           budget_hours_weekly?: number | null;
+          lifetime_start?: string | null;
+          lifetime_end?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -235,6 +241,8 @@ export interface TrackingKey {
   total_minutes: number;
   event_count: number;
   budget_hours_weekly: number | null;
+  lifetime_start: string | null;
+  lifetime_end: string | null;
   created_at: string;
   tasks?: Task[];
 }

@@ -50,8 +50,14 @@ CREATE TABLE IF NOT EXISTS tracking_keys (
   total_minutes INTEGER NOT NULL DEFAULT 0,
   event_count INTEGER NOT NULL DEFAULT 0,
   budget_hours_weekly NUMERIC(5,1) DEFAULT NULL,
+  lifetime_start DATE DEFAULT NULL,
+  lifetime_end DATE DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE tracking_keys
+  ADD COLUMN IF NOT EXISTS lifetime_start DATE DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS lifetime_end DATE DEFAULT NULL;
 
 -- Tracked events table
 CREATE TABLE IF NOT EXISTS tracked_events (

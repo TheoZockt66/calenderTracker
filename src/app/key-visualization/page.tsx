@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -196,6 +196,8 @@ function KeyPicker({
 export default function KeyVisualizationPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedKeyId = searchParams.get("key_id");
 
   const [keys, setKeys] = useState<TrackingKey[]>([]);
   const [events, setEvents] = useState<TrackedEvent[]>([]);
@@ -234,10 +236,16 @@ export default function KeyVisualizationPage() {
       .then((data: TrackingKey[]) => {
         const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
         setKeys(sorted);
+        if (selectedKeyId) {
+          const selectedIndex = sorted.findIndex((key) => key.id === selectedKeyId);
+          if (selectedIndex >= 0) {
+            setCurrentIdx(selectedIndex);
+          }
+        }
       })
       .catch(() => setKeys([]))
       .finally(() => setLoadingKeys(false));
-  }, [session]);
+  }, [session, selectedKeyId]);
 
   // Measure header height after each key change
   useEffect(() => {
@@ -247,12 +255,14 @@ export default function KeyVisualizationPage() {
   }, [currentIdx]);
 
   const currentKey = keys[currentIdx];
+  const currentKeyId = currentKey?.id;
 
   // Load events for the current key
   useEffect(() => {
-    if (!currentKey) return;
+    if (!currentKeyId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingEvents(true);
-    fetch(`/api/events?key_id=${currentKey.id}`)
+    fetch(`/api/events?key_id=${currentKeyId}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: TrackedEvent[]) => {
         const sorted = [...data].sort((a, b) =>
@@ -262,7 +272,7 @@ export default function KeyVisualizationPage() {
       })
       .catch(() => setEvents([]))
       .finally(() => setLoadingEvents(false));
-  }, [currentKey?.id]);
+  }, [currentKeyId]);
 
   // Auto-scroll to anchor entry (5 from bottom)
   useEffect(() => {

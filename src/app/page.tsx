@@ -13,7 +13,6 @@ import {
   User,
   ArrowRight,
   FolderOpen,
-  LineChart,
   Activity,
 } from "lucide-react";
 
@@ -155,19 +154,11 @@ export default function HomePage() {
             />
             <BentoCard
               icon={LayoutDashboard}
-              title="Dashboard"
-              description="Alle getrackten Zeiten auf einen Blick."
+              title="Auswertung"
+              description="Dashboard, Filter und Diagramme auf einer Seite."
               href="/dashboard"
-              cta="Dashboard öffnen"
-              gridArea="1 / 4 / 2 / 7"
-            />
-            <BentoCard
-              icon={LineChart}
-              title="Analyse"
-              description="Vergleiche Wochen & Monate, Streaks und Budgets."
-              href="/analytics"
-              cta="Analyse öffnen"
-              gridArea="2 / 4 / 3 / 7"
+              cta="Auswertung öffnen"
+              gridArea="1 / 4 / 3 / 7"
             />
             <BentoCard
               icon={Key}
@@ -229,8 +220,7 @@ export default function HomePage() {
                 </button>
               }
             />
-            <BentoCard icon={LayoutDashboard} title="Dashboard" description="Alle getrackten Zeiten auf einen Blick." gridArea="1 / 4 / 2 / 7" />
-            <BentoCard icon={LineChart} title="Analyse" description="Vergleiche Wochen & Monate, Streaks und Budgets." gridArea="2 / 4 / 3 / 7" />
+            <BentoCard icon={LayoutDashboard} title="Auswertung" description="Dashboard, Filter und Diagramme auf einer Seite." gridArea="1 / 4 / 3 / 7" />
             <BentoCard icon={Key} title="Keys verwalten" description="Tracking-Keys erstellen und organisieren." gridArea="3 / 1 / 4 / 4" />
             <BentoCard icon={FolderOpen} title="Kategorien" description="Keys in Kategorien organisieren." gridArea="3 / 4 / 4 / 7" />
             <BentoCard icon={Activity} title="Key Verlauf" description="Alle getrackte Events je Key als Timeline." gridArea="4 / 1 / 5 / 4" />

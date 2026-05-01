@@ -33,7 +33,9 @@ export default function RootLayout({
     <html lang="de" suppressHydrationWarning>
       <head>
         <ColorSchemeScript defaultColorScheme="dark" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="antialiased">
         <Providers>

@@ -62,6 +62,8 @@ export default function NewKeyPage() {
   const [taskName, setTaskName] = useState("");
   const [taskSearchTerm, setTaskSearchTerm] = useState("");
   const [budgetHoursWeekly, setBudgetHoursWeekly] = useState<string>("");
+  const [lifetimeStart, setLifetimeStart] = useState("");
+  const [lifetimeEnd, setLifetimeEnd] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -300,6 +302,31 @@ export default function NewKeyPage() {
               </p>
             </div>
 
+            <div>
+              <label className="block text-[12px] font-semibold text-[var(--app-text-muted)] mb-1.5 uppercase tracking-wider">
+                Lifetime
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="date"
+                  className="input"
+                  value={lifetimeStart}
+                  onChange={(e) => setLifetimeStart(e.target.value)}
+                  aria-label="Lifetime start date"
+                />
+                <input
+                  type="date"
+                  className="input"
+                  value={lifetimeEnd}
+                  onChange={(e) => setLifetimeEnd(e.target.value)}
+                  aria-label="Lifetime end date"
+                />
+              </div>
+              <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
+                Optional: leer lassen, nur Startdatum oder nur Enddatum setzen.
+              </p>
+            </div>
+
             {/* Color (auto-assigned) */}
             <div>
               <label className="block text-[12px] font-semibold text-[var(--app-text-muted)] mb-1.5 uppercase tracking-wider">
@@ -388,7 +415,7 @@ export default function NewKeyPage() {
                           color: "var(--app-text-muted)",
                         }}
                       >
-                        „{task.search_term}"
+                        &ldquo;{task.search_term}&rdquo;
                       </p>
                     </div>
                   </div>
@@ -548,6 +575,8 @@ export default function NewKeyPage() {
                     category_id: category || null,
                     calendar_id: calendar || null,
                     budget_hours_weekly: budgetHoursWeekly ? parseFloat(budgetHoursWeekly) : null,
+                    lifetime_start: lifetimeStart || null,
+                    lifetime_end: lifetimeEnd || null,
                   }),
                 });
                 if (!res.ok) {

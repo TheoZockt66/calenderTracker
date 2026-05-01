@@ -18,6 +18,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronUp,
+  Activity,
 } from "lucide-react";
 
 /* ───── 30 distinct colors palette ───── */
@@ -59,9 +60,12 @@ export default function EditKeyPage() {
   const [calendar, setCalendar] = useState("");
   const [color, setColor] = useState("#000000");
   const [budgetHoursWeekly, setBudgetHoursWeekly] = useState<string>("");
+  const [lifetimeStart, setLifetimeStart] = useState("");
+  const [lifetimeEnd, setLifetimeEnd] = useState("");
   const [events, setEvents] = useState<TrackedEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsExpanded, setEventsExpanded] = useState(false);
+  const [colorExpanded, setColorExpanded] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -97,6 +101,8 @@ export default function EditKeyPage() {
             setCalendar(found.calendar_id || "");
             setColor(found.color);
             setBudgetHoursWeekly(found.budget_hours_weekly != null ? String(found.budget_hours_weekly) : "");
+            setLifetimeStart(found.lifetime_start || "");
+            setLifetimeEnd(found.lifetime_end || "");
           }
         })
         .catch(() => {})
@@ -140,6 +146,8 @@ export default function EditKeyPage() {
           category_id: category || null,
           calendar_id: calendar || null,
           budget_hours_weekly: budgetHoursWeekly ? parseFloat(budgetHoursWeekly) : null,
+          lifetime_start: lifetimeStart || null,
+          lifetime_end: lifetimeEnd || null,
         }),
       });
       if (!res.ok) throw new Error("Failed to update key");
@@ -215,33 +223,43 @@ export default function EditKeyPage() {
             <ArrowLeft size={16} />
             Zurück zu Keys
           </Link>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: color + "18" }}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: color + "18" }}
+              >
+                <Key size={20} style={{ color }} />
+              </div>
+              <div className="min-w-0">
+                <h1
+                  style={{
+                    fontSize: "clamp(24px, 4vw, 32px)",
+                    fontWeight: 800,
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  {t("keys.editKey")}
+                </h1>
+                <p
+                  style={{
+                    marginTop: "2px",
+                    fontSize: "13px",
+                    color: "var(--app-text-muted)",
+                  }}
+                >
+                  Bearbeite die Einstellungen für &bdquo;{keyData.name}&ldquo;
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/key-visualization?key_id=${keyId}`}
+              className="btn-ghost"
+              style={{ textDecoration: "none", flexShrink: 0 }}
             >
-              <Key size={20} style={{ color }} />
-            </div>
-            <div>
-              <h1
-                style={{
-                  fontSize: "clamp(24px, 4vw, 32px)",
-                  fontWeight: 800,
-                  letterSpacing: "-0.03em",
-                }}
-              >
-                {t("keys.editKey")}
-              </h1>
-              <p
-                style={{
-                  marginTop: "2px",
-                  fontSize: "13px",
-                  color: "var(--app-text-muted)",
-                }}
-              >
-                Bearbeite die Einstellungen für &bdquo;{keyData.name}&ldquo;
-              </p>
-            </div>
+              <Activity size={14} />
+              Verlauf ansehen
+            </Link>
           </div>
         </div>
 
@@ -351,31 +369,55 @@ export default function EditKeyPage() {
               </p>
             </div>
 
-            {/* Color */}
             <div>
               <label className="block text-[12px] font-semibold text-[var(--app-text-muted)] mb-1.5 uppercase tracking-wider">
-                {t("keys.color")}
+                Lifetime
               </label>
-              <div className="flex flex-wrap gap-2">
-                {COLOR_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setColor(c)}
-                    className="w-8 h-8 rounded-lg border-2 transition-all"
-                    style={{
-                      backgroundColor: c,
-                      borderColor:
-                        color === c ? "white" : "transparent",
-                      transform: color === c ? "scale(1.15)" : "scale(1)",
-                      boxShadow:
-                        color === c
-                          ? `0 0 0 2px ${c}, 0 4px 12px ${c}44`
-                          : "none",
-                    }}
-                  />
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="date"
+                  className="input"
+                  value={lifetimeStart}
+                  onChange={(e) => setLifetimeStart(e.target.value)}
+                  aria-label="Lifetime start date"
+                />
+                <input
+                  type="date"
+                  className="input"
+                  value={lifetimeEnd}
+                  onChange={(e) => setLifetimeEnd(e.target.value)}
+                  aria-label="Lifetime end date"
+                />
               </div>
-              <div className="flex items-center gap-3 mt-3">
+              <p style={{ marginTop: "4px", fontSize: "11px", color: "var(--app-text-muted)" }}>
+                Optional: leer lassen, nur Startdatum oder nur Enddatum setzen.
+              </p>
+            </div>
+
+            {/* Color */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setColorExpanded((value) => !value)}
+                className="w-full flex items-center justify-between"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "inherit",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                <span className="block text-[12px] font-semibold text-[var(--app-text-muted)] uppercase tracking-wider">
+                  {t("keys.color")}
+                </span>
+                {colorExpanded ? (
+                  <ChevronUp size={16} style={{ color: "var(--app-text-muted)" }} />
+                ) : (
+                  <ChevronDown size={16} style={{ color: "var(--app-text-muted)" }} />
+                )}
+              </button>
+              <div className="flex items-center gap-3 mt-2">
                 <div
                   className="w-10 h-10 rounded-lg border border-[var(--app-border)]"
                   style={{ backgroundColor: color }}
@@ -384,6 +426,28 @@ export default function EditKeyPage() {
                   {color}
                 </span>
               </div>
+              {colorExpanded && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {COLOR_PALETTE.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setColor(c)}
+                      className="w-8 h-8 rounded-lg border-2 transition-all"
+                      style={{
+                        backgroundColor: c,
+                        borderColor:
+                          color === c ? "white" : "transparent",
+                        transform: color === c ? "scale(1.15)" : "scale(1)",
+                        boxShadow:
+                          color === c
+                            ? `0 0 0 2px ${c}, 0 4px 12px ${c}44`
+                            : "none",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

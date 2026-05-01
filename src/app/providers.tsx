@@ -2,8 +2,14 @@
 
 import { MantineProvider, createTheme, MantineColorsTuple } from "@mantine/core";
 import { I18nProvider } from "@/lib/i18n";
+import { PwaInstallProvider } from "@/lib/pwa-install";
+import type { Session } from "next-auth";
 import { SessionProvider, useSession, signOut } from "next-auth/react";
 import { useEffect } from "react";
+
+type SessionWithError = Session & {
+  error?: string;
+};
 
 const darkColors: MantineColorsTuple = [
   '#1a1a1a',
@@ -93,7 +99,7 @@ function SessionWatcher() {
   const { data: session } = useSession();
 
   useEffect(() => {
-    if ((session as any)?.error === "RefreshAccessTokenError") {
+    if ((session as SessionWithError | null)?.error === "RefreshAccessTokenError") {
       signOut({ callbackUrl: "/" });
       return;
     }
@@ -118,7 +124,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <SessionWatcher />
       <MantineProvider theme={theme} defaultColorScheme="dark">
-        <I18nProvider>{children}</I18nProvider>
+        <PwaInstallProvider>
+          <I18nProvider>{children}</I18nProvider>
+        </PwaInstallProvider>
       </MantineProvider>
     </SessionProvider>
   );
