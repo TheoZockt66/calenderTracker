@@ -13,6 +13,8 @@ import {
   BarChart3,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Loader2,
   RefreshCw,
@@ -35,7 +37,7 @@ type SyncResult = {
   error?: string
 }
 
-type ChartMode = "week" | "month"
+type ChartMode = "day" | "week" | "month"
 
 function toDateInputValue(date: Date) {
   return date.toISOString().split("T")[0]
@@ -67,6 +69,13 @@ function getMonthLabel(date: Date) {
   return date.toLocaleDateString("de-DE", {
     month: "short",
     year: "2-digit",
+  })
+}
+
+function getDayLabel(date: Date) {
+  return date.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
   })
 }
 
@@ -112,7 +121,7 @@ function DatePicker({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "7px", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "7px", position: "relative", zIndex: open ? 1000 : "auto" }}>
       <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--app-text-muted)" }}>
         {label}
       </span>
@@ -141,7 +150,7 @@ function DatePicker({
             position: "absolute",
             top: "76px",
             left: 0,
-            zIndex: 40,
+            zIndex: 10000,
             width: "300px",
             padding: "14px",
             borderRadius: "18px",
@@ -151,13 +160,15 @@ function DatePicker({
           }}
         >
           <div className="flex items-center justify-between mb-3">
-            <button type="button" className="btn-ghost" onClick={() => changeMonth(-1)} style={{ width: "34px", height: "34px", padding: 0 }}>
+            <button type="button" className="btn-ghost" aria-label="Vorheriger Monat" onClick={() => changeMonth(-1)} style={{ width: "34px", height: "34px", padding: 0, borderRadius: "999px", border: "1px solid var(--app-border)", background: "var(--app-accent-soft)", color: "var(--app-text)", fontSize: 0 }}>
+              <ChevronLeft size={16} />
               ‹
             </button>
             <span style={{ fontSize: "13px", fontWeight: 800, textTransform: "capitalize" }}>
               {monthLabel}
             </span>
-            <button type="button" className="btn-ghost" onClick={() => changeMonth(1)} style={{ width: "34px", height: "34px", padding: 0 }}>
+            <button type="button" className="btn-ghost" aria-label="Nächster Monat" onClick={() => changeMonth(1)} style={{ width: "34px", height: "34px", padding: 0, borderRadius: "999px", border: "1px solid var(--app-border)", background: "var(--app-accent-soft)", color: "var(--app-text)", fontSize: 0 }}>
+              <ChevronRight size={16} />
               ›
             </button>
           </div>
@@ -284,61 +295,63 @@ function BarChart({
           Keine Daten im gewählten Zeitraum
         </div>
       ) : (
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", height: "220px" }}>
-          {data.map((item) => {
-            const height = Math.max((item.minutes / maxMinutes) * 100, item.minutes > 0 ? 4 : 0)
-            return (
-              <div
-                key={item.label}
-                style={{
-                  flex: 1,
-                  minWidth: "34px",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <span
+        <div style={{ overflowX: "auto", paddingBottom: "4px" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", height: "220px", minWidth: `${Math.max(data.length * 48, 320)}px` }}>
+            {data.map((item) => {
+              const height = Math.max((item.minutes / maxMinutes) * 100, item.minutes > 0 ? 4 : 0)
+              return (
+                <div
+                  key={item.label}
                   style={{
-                    fontSize: "10px",
-                    color: "var(--app-text-muted)",
-                    minHeight: "16px",
-                    fontVariantNumeric: "tabular-nums",
+                    flex: 1,
+                    minWidth: "34px",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                   }}
                 >
-                  {item.minutes > 0 ? formatMinutes(item.minutes) : ""}
-                </span>
-                <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end" }}>
-                  <div
-                    title={`${item.label}: ${formatMinutes(item.minutes)}`}
+                  <span
                     style={{
-                      width: "100%",
-                      height: `${height}%`,
-                      borderRadius: "7px 7px 3px 3px",
-                      background:
-                        item.minutes > 0
-                          ? "linear-gradient(180deg, #34C759 0%, #5856D6 100%)"
-                          : "var(--app-accent-soft)",
-                      border: "1px solid var(--app-border)",
-                      transition: "height 0.25s ease",
+                      fontSize: "10px",
+                      color: "var(--app-text-muted)",
+                      minHeight: "16px",
+                      fontVariantNumeric: "tabular-nums",
                     }}
-                  />
+                  >
+                    {item.minutes > 0 ? formatMinutes(item.minutes) : ""}
+                  </span>
+                  <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end" }}>
+                    <div
+                      title={`${item.label}: ${formatMinutes(item.minutes)}`}
+                      style={{
+                        width: "100%",
+                        height: `${height}%`,
+                        borderRadius: "7px 7px 3px 3px",
+                        background:
+                          item.minutes > 0
+                            ? "linear-gradient(180deg, #34C759 0%, #5856D6 100%)"
+                            : "var(--app-accent-soft)",
+                        border: "1px solid var(--app-border)",
+                        transition: "height 0.25s ease",
+                      }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      marginTop: "8px",
+                      color: "var(--app-text-muted)",
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {item.label}
+                  </span>
                 </div>
-                <span
-                  style={{
-                    fontSize: "10px",
-                    marginTop: "8px",
-                    color: "var(--app-text-muted)",
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {item.label}
-                </span>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -481,6 +494,23 @@ export default function DashboardPage() {
       .sort((a, b) => b.minutes - a.minutes)
   }, [filteredEvents, keyMap])
 
+  const dailyData = useMemo(() => {
+    const map = new Map<string, ChartPoint>()
+
+    for (const event of filteredEvents) {
+      const eventDate = new Date(`${event.event_date}T00:00:00`)
+      const label = getDayLabel(eventDate)
+      const current = map.get(event.event_date) || { label, minutes: 0, events: 0 }
+      current.minutes += event.duration_minutes
+      current.events += 1
+      map.set(event.event_date, current)
+    }
+
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, value]) => value)
+  }, [filteredEvents])
+
   const weeklyData = useMemo(() => {
     const map = new Map<string, ChartPoint>()
 
@@ -516,7 +546,11 @@ export default function DashboardPage() {
       .map(([, value]) => value)
   }, [filteredEvents])
 
-  const chartData = chartMode === "week" ? weeklyData : monthlyData
+  const chartData =
+    chartMode === "day" ? dailyData : chartMode === "week" ? weeklyData : monthlyData
+
+  const chartTitle =
+    chartMode === "day" ? "Tagesansicht" : chartMode === "week" ? "Wochenansicht" : "Monatsansicht"
 
   const handleSync = async () => {
     setSyncing(true)
@@ -623,7 +657,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="glow-card animate-fade-up delay-1" style={{ padding: "20px", marginBottom: "20px" }}>
+        <div className="glow-card animate-fade-up delay-1" style={{ padding: "20px", marginBottom: "20px", overflow: "visible", position: "relative", zIndex: filtersOpen ? 50 : "auto" }}>
           <button
             onClick={() => setFiltersOpen((value) => !value)}
             className="w-full flex items-center justify-between"
@@ -776,6 +810,7 @@ export default function DashboardPage() {
             >
               {(
                 [
+                  { key: "day", label: "Tag" },
                   { key: "week", label: "Woche" },
                   { key: "month", label: "Monat" },
                 ] as const
@@ -801,7 +836,7 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          <BarChart title={chartMode === "week" ? "Wochenansicht" : "Monatsansicht"} data={chartData} />
+          <BarChart title={chartTitle} data={chartData} />
         </div>
 
         <div className="glow-card animate-fade-up delay-3" style={{ padding: "20px" }}>

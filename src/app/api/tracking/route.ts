@@ -66,16 +66,19 @@ export async function POST(req: NextRequest) {
     // 2. Get existing tracked event IDs to prevent duplicates
     const { data: existingEvents } = await supabase
       .from("tracked_events")
-      .select("id, summary, start_time, key_id, event_date")
+      .select("id, summary, start_time, key_id, key_name, event_date, duration_minutes")
       .eq("user_id", user.id);
 
-    const existingSet = new Set(
+    const existingMap = new Map(
       (existingEvents || []).map(
-        (e) => `${e.key_id}|${e.summary}|${new Date(e.start_time).getTime()}`
+        (e) => [
+          `${e.key_id}|${e.summary}|${new Date(e.start_time).getTime()}`,
+          e,
+        ]
       )
     );
 
-    debugLog.push(`${existingSet.size} bereits getrackte Events in DB.`);
+    debugLog.push(`${existingMap.size} bereits getrackte Events in DB.`);
 
     // 4. Fetch calendar events (full sync always — incremental sync misses past events that were planned before the last sync token)
     const now = new Date();
@@ -148,6 +151,7 @@ export async function POST(req: NextRequest) {
     // 5. Match events against keys (supports multiple comma-separated search terms)
     let totalMatched = 0;
     let newEventsCount = 0;
+    let updatedEventsCount = 0;
     let skippedDuplicates = 0;
     let skippedAllDay = 0;
     const keyUpdates = new Map<string, { addMinutes: number; addEvents: number }>();
@@ -170,25 +174,61 @@ export async function POST(req: NextRequest) {
 
       if (durationMinutes <= 0) continue;
 
-      for (const key of keys) {
+      const eventDate = event.start.split("T")[0];
+      const matchingKeys = keys.filter((key) => {
         const rawSearchKey = key.search_key || key.name || "";
-        if (!rawSearchKey.trim()) continue;
-        const eventDate = event.start.split("T")[0];
-        if (!isWithinLifetime(eventDate, key.lifetime_start, key.lifetime_end)) continue;
+        if (!rawSearchKey.trim()) return false;
+        if (!isWithinLifetime(eventDate, key.lifetime_start, key.lifetime_end)) return false;
 
         const matches = matchesSearchKey(event.summary, rawSearchKey);
 
         // Calendar filter: only if key has a specific calendar assigned
         const calendarMatch = !key.calendar_id || key.calendar_id === event.calendarId;
 
-        if (matches && calendarMatch) {
-          totalMatched++;
+        return matches && calendarMatch;
+      });
 
-          const dedupeKey = `${key.id}|${event.summary}|${startDate.getTime()}`;
-          if (existingSet.has(dedupeKey)) {
-            skippedDuplicates++;
-            continue;
+      if (matchingKeys.length === 0) continue;
+
+      totalMatched += matchingKeys.length;
+
+      const baseMinutes = Math.floor(durationMinutes / matchingKeys.length);
+      const remainder = durationMinutes % matchingKeys.length;
+
+      for (const [index, key] of matchingKeys.entries()) {
+        const allocatedMinutes = baseMinutes + (index < remainder ? 1 : 0);
+        const dedupeKey = `${key.id}|${event.summary}|${startDate.getTime()}`;
+        const existingEvent = existingMap.get(dedupeKey);
+
+        if (existingEvent) {
+          skippedDuplicates++;
+
+          if (
+            existingEvent.duration_minutes !== allocatedMinutes ||
+            existingEvent.key_name !== key.name
+          ) {
+            const { error: updateError } = await supabase
+              .from("tracked_events")
+              .update({
+                duration_minutes: allocatedMinutes,
+                key_name: key.name,
+              })
+              .eq("id", existingEvent.id);
+
+            if (!updateError) {
+              updatedEventsCount++;
+              existingMap.set(dedupeKey, {
+                ...existingEvent,
+                duration_minutes: allocatedMinutes,
+                key_name: key.name,
+              });
+            } else {
+              debugLog.push(`âš  Update-Fehler fÃ¼r "${event.summary}": ${updateError.message}`);
+            }
           }
+
+          continue;
+        }
 
           const { error: insertError } = await supabase
             .from("tracked_events")
@@ -198,31 +238,38 @@ export async function POST(req: NextRequest) {
               key_name: key.name,
               start_time: event.start,
               end_time: event.end,
-              duration_minutes: durationMinutes,
+              duration_minutes: allocatedMinutes,
               event_date: eventDate,
               user_id: user.id,
             });
 
           if (!insertError) {
             newEventsCount++;
-            existingSet.add(dedupeKey);
+            existingMap.set(dedupeKey, {
+              id: dedupeKey,
+              summary: event.summary,
+              key_id: key.id,
+              key_name: key.name,
+              start_time: event.start,
+              duration_minutes: allocatedMinutes,
+              event_date: eventDate,
+            });
 
             if (matchedSamples.length < 10) {
-              matchedSamples.push(`"${event.summary}" → ${key.name} (${durationMinutes}min)`);
+              matchedSamples.push(`"${event.summary}" → ${key.name} (${allocatedMinutes}min von ${durationMinutes}min)`);
             }
 
             const existing = keyUpdates.get(key.id) || { addMinutes: 0, addEvents: 0 };
-            existing.addMinutes += durationMinutes;
+            existing.addMinutes += allocatedMinutes;
             existing.addEvents += 1;
             keyUpdates.set(key.id, existing);
           } else {
             debugLog.push(`⚠ Insert-Fehler für "${event.summary}": ${insertError.message}`);
           }
-        }
       }
     }
 
-    debugLog.push(`Matching: ${totalMatched} Treffer, ${newEventsCount} neu, ${skippedDuplicates} Duplikate übersprungen, ${skippedAllDay} ganztägige übersprungen.`);
+    debugLog.push(`Matching: ${totalMatched} Treffer, ${newEventsCount} neu, ${updatedEventsCount} aktualisiert, ${skippedDuplicates} Duplikate übersprungen, ${skippedAllDay} ganztägige übersprungen.`);
 
     // 6. Cleanup: Remove tracked events whose calendar events no longer exist
     const calendarEventSignatures = new Set(
@@ -304,6 +351,7 @@ export async function POST(req: NextRequest) {
       totalCalendarEvents: allEvents.length,
       matched: totalMatched,
       newEvents: newEventsCount,
+      updatedEvents: updatedEventsCount,
       removedEvents: removedCount,
       skippedDuplicates,
       keysUpdated: affectedKeyIds.size,

@@ -118,7 +118,7 @@ const DataTableFilter: React.FC<DataTableFilterProps> = ({
               left: 0,
               zIndex: 9999,
               overflow: "hidden",
-              minWidth: "200px",
+              minWidth: "240px",
               backgroundColor: "var(--app-surface)",
               borderRadius: "12px",
               border: "1px solid var(--border)",
@@ -174,11 +174,11 @@ const DataTableFilter: React.FC<DataTableFilterProps> = ({
               {(isMultiSelect || currentValues.length > 0) && (
                 <>
                   <div className="h-px bg-border my-1" />
-                  <div className="flex items-center gap-1 px-1">
+                  <div className="flex flex-col gap-1 px-1">
                     {isMultiSelect && (
                       <button
                         onClick={() => onChange(isAllSelected ? [] : options.map((o) => o.value))}
-                        className="flex-1 h-7 text-xs text-muted-foreground rounded-md hover:bg-accent transition-colors font-medium"
+                        className="w-full h-8 text-xs text-muted-foreground rounded-md hover:bg-accent transition-colors font-medium"
                       >
                         {isAllSelected ? "Keine" : "Alle"}
                       </button>
@@ -187,8 +187,7 @@ const DataTableFilter: React.FC<DataTableFilterProps> = ({
                       onClick={() => onChange([])}
                       disabled={isNoneSelected}
                       className={cn(
-                        "h-7 text-xs text-destructive rounded-md hover:bg-destructive/10 transition-colors font-medium disabled:opacity-40",
-                        isMultiSelect ? "flex-1" : "w-full",
+                        "w-full h-8 text-xs text-destructive rounded-md hover:bg-destructive/10 transition-colors font-medium disabled:opacity-40",
                       )}
                     >
                       Filter löschen
